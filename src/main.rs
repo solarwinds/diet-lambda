@@ -43,7 +43,7 @@ fn main() -> Result<(), Error> {
     let mut init = false;
 
     let token = CancellationToken::new();
-    tokio::spawn(signal(token.clone()));
+    rt.spawn(signal(token.clone()));
 
     let result = rt.block_on(async {
         if token
@@ -71,7 +71,7 @@ fn main() -> Result<(), Error> {
             token.clone(),
         ));
 
-        let tasks = tokio::spawn({
+        let tasks = rt.spawn({
             let token = token.clone();
             async move {
                 while let Some(result) = tasks.join_next().await {

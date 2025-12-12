@@ -47,6 +47,8 @@ struct State {
 
 trait OtlpRequest: Message {
     type Response: OtlpResponse;
+
+    fn is_empty(&self) -> bool;
 }
 trait OtlpResponse: Message + Default {
     fn log(&self);
@@ -54,6 +56,10 @@ trait OtlpResponse: Message + Default {
 
 impl OtlpRequest for ExportTraceServiceRequest {
     type Response = ExportTraceServiceResponse;
+
+    fn is_empty(&self) -> bool {
+        self.resource_spans.is_empty()
+    }
 }
 impl OtlpResponse for ExportTraceServiceResponse {
     fn log(&self) {
@@ -71,6 +77,10 @@ impl OtlpResponse for ExportTraceServiceResponse {
 
 impl OtlpRequest for ExportMetricsServiceRequest {
     type Response = ExportMetricsServiceResponse;
+
+    fn is_empty(&self) -> bool {
+        self.resource_metrics.is_empty()
+    }
 }
 impl OtlpResponse for ExportMetricsServiceResponse {
     fn log(&self) {
@@ -88,6 +98,10 @@ impl OtlpResponse for ExportMetricsServiceResponse {
 
 impl OtlpRequest for ExportLogsServiceRequest {
     type Response = ExportLogsServiceResponse;
+
+    fn is_empty(&self) -> bool {
+        self.resource_logs.is_empty()
+    }
 }
 impl OtlpResponse for ExportLogsServiceResponse {
     fn log(&self) {
@@ -105,6 +119,10 @@ impl OtlpResponse for ExportLogsServiceResponse {
 
 impl OtlpRequest for ExportProfilesServiceRequest {
     type Response = ExportProfilesServiceResponse;
+
+    fn is_empty(&self) -> bool {
+        self.resource_profiles.is_empty()
+    }
 }
 impl OtlpResponse for ExportProfilesServiceResponse {
     fn log(&self) {
@@ -129,6 +147,10 @@ async fn send<R>(
 where
     R: OtlpRequest,
 {
+    if request.is_empty() {
+        return Ok(());
+    }
+
     let mut buf = BytesMut::with_capacity(request.encoded_len());
     request.encode(&mut buf)?;
 

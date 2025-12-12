@@ -13,3 +13,21 @@ jobs:
       - run: cargo check
       - run: cargo fmt -- --check
       - run: cargo clippy -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    container: amazonlinux:2
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - run: cargo build --release
+      - run: mkdir -p target/lambda/opt/extensions
+      - run: cp target/release/diet-lambda target/opt/extensions/diet-lambda
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diet-lambda
+          path: target/lambda
+          compression-level: 9

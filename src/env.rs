@@ -51,7 +51,7 @@ impl Config {
     ];
     pub const ID_HEADER: &str = "Lambda-Extension-Identifier";
 
-    pub const SETTINGS_PATH: &str = "/var/tmp/solarwinds-apm-settings.json";
+    pub const SETTINGS_PATH: &str = "/tmp/solarwinds-apm-settings.json";
     pub const SETTINGS_INTERVAL: Duration = Duration::from_secs(10);
 
     pub const TRACES_ROUTE: &str = "/v1/traces";

@@ -144,13 +144,15 @@ where
         )
         .await?;
 
-    let body = response.into_body().collect().await?.to_bytes();
+    let (parts, body) = response.into_parts();
+    let body = body.collect().await?.to_bytes();
+
     if let Ok(res) = R::Response::decode(body.as_ref()) {
         res.log();
     } else if let Ok(status) = Status::decode(body.as_ref()) {
         eprintln!("failed to export telemetry: {}", status.message);
     } else {
-        eprintln!("invalid response from collector");
+        eprintln!("invalid response from collector: {:#?}", parts);
     }
 
     Ok(())

@@ -72,6 +72,8 @@ pub async fn task(
         let contents = token.run_until_cancelled(fetch(&client, &config)).await;
         match contents {
             Some(Ok(contents)) => {
+                // We do this outside the fetch routine because we do NOT want
+                // to get cancelled mid-write.
                 if let Err(err) = fs::write(Config::SETTINGS_PATH, contents).await {
                     eprintln!("failed to write sampling settings: {err}");
                 }

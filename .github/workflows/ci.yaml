@@ -23,16 +23,16 @@ jobs:
     container: amazonlinux:2023
 
     steps:
-      - run: dnf update -y && dnf install -y git gcc pkg-config openssl-devel
+      - run: dnf update -y && dnf install -y git tar gcc pkg-config openssl-devel
 
       - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - run: cargo build --release
-      - run: mkdir -p target/lambda/opt/extensions
-      - run: cp target/release/diet-lambda target/lambda/opt/extensions/diet-lambda
+      - run: mkdir -p target/opt/extensions
+      - run: cp target/release/diet-lambda target/opt/extensions/diet-lambda
 
       - uses: actions/upload-artifact@v5
         with:
           name: diet-lambda-${{ matrix.arch }}
-          path: target/lambda
+          path: target/opt

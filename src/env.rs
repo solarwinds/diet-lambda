@@ -76,8 +76,10 @@ impl Config {
 
         let api_token = env::var("SW_APM_API_TOKEN")
             .ok()
-            .or_else(|| service_key.map(|(_, token)| token.to_string()))
-            .context("missing API token")?;
+            .or_else(|| service_key.map(|(_, token)| token.to_string())).unwrap_or_else(|| {
+                eprintln!("Missing SolarWinds APM API token. Please set the `SW_APM_API_TOKEN` environment variable to enable sampling.");
+                "missing".to_string()
+            });
 
         let data_center = env::var("SW_APM_DATA_CENTER")
             .ok()

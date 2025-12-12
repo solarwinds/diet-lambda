@@ -142,9 +142,11 @@ impl<T: Message + Serialize> IntoResponse for Otlp<T> {
 
 impl<E: std::error::Error> IntoResponse for OtlpError<E> {
     fn into_response(self) -> Response {
+        eprintln!("http exporter error: {}", self.error);
+
         let status = Status {
             message: self.error.to_string(),
-            code: self.status.as_u16() as i32,
+            code: 2,
         };
 
         match self.ty {

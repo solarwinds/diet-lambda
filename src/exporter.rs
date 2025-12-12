@@ -158,6 +158,7 @@ where
     let response = client
         .call(
             Request::builder()
+                .method("POST")
                 .uri(url)
                 .header(CONTENT_TYPE, "application/x-protobuf")
                 .header(AUTHORIZATION, format!("Bearer {token}"))

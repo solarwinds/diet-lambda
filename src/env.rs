@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Error};
 
 pub struct Config {
-    pub service: String,
+    pub _service: String,
     pub token: String,
 
     pub executable: String,
@@ -144,7 +144,7 @@ impl Config {
                 },
             },
 
-            service: service_name,
+            _service: service_name,
             token: api_token,
 
             executable,

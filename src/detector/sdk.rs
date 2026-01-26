@@ -1,0 +1,24 @@
+use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value};
+
+pub fn detect(attributes: &mut Vec<KeyValue>) {
+    attributes.push(KeyValue {
+        key: "telemetry.sdk.language".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue("rust".to_string())),
+        }),
+    });
+
+    attributes.push(KeyValue {
+        key: "telemetry.sdk.name".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue(env!("CARGO_PKG_NAME").to_string())),
+        }),
+    });
+
+    attributes.push(KeyValue {
+        key: "telemetry.sdk.version".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue(env!("CARGO_PKG_VERSION").to_string())),
+        }),
+    });
+}

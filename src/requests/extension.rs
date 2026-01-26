@@ -3,14 +3,20 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::Request;
 use lambda_extension::NextEvent;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     env::Config,
     util::{Client, body},
 };
 
-pub async fn register(client: &Client, config: &Config) -> Result<String, Error> {
+pub async fn register(client: &Client, config: &Config) -> Result<(String, Option<String>), Error> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Response {
+        account_id: String,
+    }
+
     let data = if config.managed {
         r#"{ "events": ["SHUTDOWN"] }"#
     } else {
@@ -23,6 +29,7 @@ pub async fn register(client: &Client, config: &Config) -> Result<String, Error>
                 .method("POST")
                 .uri(&config.urls.extension.register)
                 .header("Lambda-Extension-Name", &config.executable)
+                .header("Lambda-Extension-Accept-Feature", "accountId")
                 .body(body(Full::new(Bytes::from_static(data.as_bytes()))))?,
         )
         .await
@@ -33,9 +40,16 @@ pub async fn register(client: &Client, config: &Config) -> Result<String, Error>
         .get(Config::ID_HEADER)
         .context("registration response invalid")?
         .to_str()
-        .context("registration response invalid")?;
+        .context("registration response invalid")?
+        .to_string();
 
-    Ok(id.to_string())
+    let body = response.into_body().collect().await?.to_bytes();
+    let account_id = match serde_json::from_slice::<Response>(&body) {
+        Ok(Response { account_id }) => Some(account_id),
+        _ => None,
+    };
+
+    Ok((id, account_id))
 }
 
 pub async fn next(client: &Client, config: &Config, id: &str) -> Result<NextEvent, Error> {

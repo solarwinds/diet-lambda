@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{env::Config, util::flatten};
 
+mod detector;
 mod env;
 mod exporter;
 mod requests;
@@ -39,7 +40,8 @@ fn main() -> Result<(), Error> {
     let (tx, rx) = mpsc::unbounded_channel();
     let (notifier, mut watcher) = watch::channel(None);
 
-    let id = rt.block_on(requests::extension::register(&client, &config))?;
+    let (id, account_id) = rt.block_on(requests::extension::register(&client, &config))?;
+    let (service_id, attributes) = detector::detect(account_id);
     let mut init = false;
 
     let token = CancellationToken::new();
@@ -64,6 +66,8 @@ fn main() -> Result<(), Error> {
             config.clone(),
             client.clone(),
             token.clone(),
+            service_id,
+            attributes,
         ));
         tasks.spawn(settings::task(
             config.clone(),

@@ -17,6 +17,7 @@ async fn telemetry(
             LambdaTelemetryRecord::PlatformRuntimeDone { request_id, .. } => {
                 let _ = tx.send(ServiceRequest::Flush(request_id));
             }
+            LambdaTelemetryRecord::Function(record) => {}
             _ => continue,
         }
     }

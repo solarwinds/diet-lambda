@@ -14,6 +14,8 @@ use opentelemetry_proto::tonic::{
         profiles::v1development::{ExportProfilesServiceRequest, ExportProfilesServiceResponse},
         trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     },
+    common::v1::KeyValue,
+    resource::v1::Resource,
     trace::v1::Status,
 };
 use prost::Message;
@@ -24,6 +26,7 @@ use tokio::{
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tower::Service;
 use tower_http::follow_redirect::FollowRedirect;
+use uuid::Uuid;
 
 use crate::{
     ServiceRequest,
@@ -43,12 +46,16 @@ struct State {
 
     notifier: watch::Sender<Option<String>>,
     tracker: TaskTracker,
+
+    instance_id: Uuid,
+    attributes: Arc<[KeyValue]>,
 }
 
 trait OtlpRequest: Message {
     type Response: OtlpResponse;
 
     fn is_empty(&self) -> bool;
+    fn resources_mut(&mut self) -> impl Iterator<Item = &mut Resource>;
 }
 trait OtlpResponse: Message + Default {
     fn log(&self);
@@ -59,6 +66,12 @@ impl OtlpRequest for ExportTraceServiceRequest {
 
     fn is_empty(&self) -> bool {
         self.resource_spans.is_empty()
+    }
+
+    fn resources_mut(&mut self) -> impl Iterator<Item = &mut Resource> {
+        self.resource_spans
+            .iter_mut()
+            .filter_map(|rs| rs.resource.as_mut())
     }
 }
 impl OtlpResponse for ExportTraceServiceResponse {
@@ -81,6 +94,12 @@ impl OtlpRequest for ExportMetricsServiceRequest {
     fn is_empty(&self) -> bool {
         self.resource_metrics.is_empty()
     }
+
+    fn resources_mut(&mut self) -> impl Iterator<Item = &mut Resource> {
+        self.resource_metrics
+            .iter_mut()
+            .filter_map(|rm| rm.resource.as_mut())
+    }
 }
 impl OtlpResponse for ExportMetricsServiceResponse {
     fn log(&self) {
@@ -101,6 +120,12 @@ impl OtlpRequest for ExportLogsServiceRequest {
 
     fn is_empty(&self) -> bool {
         self.resource_logs.is_empty()
+    }
+
+    fn resources_mut(&mut self) -> impl Iterator<Item = &mut Resource> {
+        self.resource_logs
+            .iter_mut()
+            .filter_map(|rl| rl.resource.as_mut())
     }
 }
 impl OtlpResponse for ExportLogsServiceResponse {
@@ -123,6 +148,12 @@ impl OtlpRequest for ExportProfilesServiceRequest {
     fn is_empty(&self) -> bool {
         self.resource_profiles.is_empty()
     }
+
+    fn resources_mut(&mut self) -> impl Iterator<Item = &mut Resource> {
+        self.resource_profiles
+            .iter_mut()
+            .filter_map(|rp| rp.resource.as_mut())
+    }
 }
 impl OtlpResponse for ExportProfilesServiceResponse {
     fn log(&self) {
@@ -139,16 +170,22 @@ impl OtlpResponse for ExportProfilesServiceResponse {
 }
 
 async fn send<R>(
-    request: R,
+    mut request: R,
     mut client: FollowRedirect<Client>,
     url: String,
     token: String,
+    instance_id: Uuid,
+    attributes: Arc<[KeyValue]>,
 ) -> Result<(), Error>
 where
     R: OtlpRequest,
 {
     if request.is_empty() {
         return Ok(());
+    }
+
+    for resource in request.resources_mut() {
+        crate::detector::augment(resource, instance_id, &attributes);
     }
 
     let mut buf = BytesMut::with_capacity(request.encoded_len());
@@ -190,6 +227,8 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.traces.clone(),
         config.token.clone(),
+        state.instance_id,
+        state.attributes.clone(),
     ));
 
     tasks.spawn(send(
@@ -197,6 +236,8 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.metrics.clone(),
         config.token.clone(),
+        state.instance_id,
+        state.attributes.clone(),
     ));
 
     tasks.spawn(send(
@@ -204,6 +245,8 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.logs.clone(),
         config.token.clone(),
+        state.instance_id,
+        state.attributes.clone(),
     ));
 
     for profile in mem::take(&mut state.profiles) {
@@ -212,6 +255,8 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
             state.client.clone(),
             config.urls.exporters.profiles.clone(),
             config.token.clone(),
+            state.instance_id,
+            state.attributes.clone(),
         ));
     }
 
@@ -234,6 +279,8 @@ pub async fn task(
     config: Arc<Config>,
     client: Client,
     token: CancellationToken,
+    instance_id: Uuid,
+    attributes: Arc<[KeyValue]>,
 ) -> Result<(), Error> {
     let mut state = State {
         client: FollowRedirect::new(client),
@@ -247,6 +294,9 @@ pub async fn task(
 
         tracker: TaskTracker::new(),
         notifier,
+
+        instance_id,
+        attributes,
     };
 
     loop {

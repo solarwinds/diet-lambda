@@ -12,7 +12,7 @@ pub async fn register(client: &Client, config: &Config, id: &str) -> Result<(), 
     let data = format!(
         r#"{{
             "schemaVersion": "2025-01-29",
-            "types": ["platform"],
+            "types": ["platform", "function"],
             "buffering": {{
                 "maxItems": 10000,
                 "maxBytes": 262144,

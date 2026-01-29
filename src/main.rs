@@ -16,6 +16,7 @@ use crate::{env::Config, util::flatten};
 mod detector;
 mod env;
 mod exporter;
+mod logs;
 mod requests;
 mod server;
 mod settings;

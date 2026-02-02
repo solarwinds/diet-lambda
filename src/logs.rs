@@ -8,7 +8,6 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value};
 
 pub fn parse(record: String, observed: DateTime<Utc>) -> Option<LogRecord> {
-    eprintln!("{record}");
     let observed_time: u64 = observed.timestamp_nanos_opt()?.try_into().ok()?;
 
     if let Ok(record) = serde_json::from_str::<JsonLogRecord>(&record) {
@@ -40,19 +39,14 @@ fn parse_text(record: &str) -> Option<(u64, &str, &str, &str)> {
     static DELIMITERS: &[char] = &[' ', '\t'];
 
     let (timestamp, rest) = record.split_once(DELIMITERS)?;
-    eprintln!("timestamp: {}", timestamp);
     let time = DateTime::parse_from_rfc3339(timestamp)
         .ok()?
         .timestamp_nanos_opt()?
         .try_into()
         .ok()?;
-    eprintln!("time: {}", time);
 
     let (request_id, rest) = rest.split_once(DELIMITERS)?;
-    eprintln!("request_id: {}", request_id);
     let (severity_text, message) = rest.split_once(DELIMITERS)?;
-    eprintln!("severity_text: {}", severity_text);
-    eprintln!("message: {}", message);
 
     Some((time, request_id, severity_text, message))
 }

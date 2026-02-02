@@ -233,12 +233,12 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         .flat_map(|ss| ss.spans.iter());
 
     for span in spans {
-        let invocation_id = span
+        let id = span
             .attributes
             .iter()
-            .find(|kv| kv.key == "faas.invocation_id");
+            .find(|kv| kv.key == "faas.invocation_id" || kv.key == "faas.execution");
 
-        if let Some(kv) = invocation_id
+        if let Some(kv) = id
             && let Some(value) = kv.value.as_ref()
             && let Some(Value::StringValue(id)) = value.value.as_ref()
             && span.trace_id.len() == 16

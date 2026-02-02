@@ -1,4 +1,4 @@
-use std::{future, mem, sync::Arc, time::Instant};
+use std::{future, mem, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use anyhow::Error;
 use bytes::BytesMut;
@@ -7,6 +7,7 @@ use hyper::{
     Request,
     header::{AUTHORIZATION, CONTENT_TYPE, USER_AGENT},
 };
+use lru::LruCache;
 use opentelemetry_proto::tonic::{
     collector::{
         logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
@@ -14,7 +15,7 @@ use opentelemetry_proto::tonic::{
         profiles::v1development::{ExportProfilesServiceRequest, ExportProfilesServiceResponse},
         trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
     },
-    common::v1::KeyValue,
+    common::v1::{KeyValue, any_value::Value},
     resource::v1::Resource,
     trace::v1::Status,
 };
@@ -49,6 +50,8 @@ struct State {
 
     instance_id: Uuid,
     attributes: Arc<[KeyValue]>,
+    /// Maps FaaS invocation IDs to trace and span IDs
+    cache: LruCache<Vec<u8>, (Vec<u8>, Vec<u8>)>,
 }
 
 trait OtlpRequest: Message {
@@ -222,6 +225,52 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
     let notifier = state.notifier.clone();
     let mut tasks = JoinSet::new();
 
+    let spans = state
+        .traces
+        .resource_spans
+        .iter()
+        .flat_map(|rs| rs.scope_spans.iter())
+        .flat_map(|ss| ss.spans.iter());
+
+    for span in spans {
+        let invocation_id = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "faas.invocation_id");
+
+        if let Some(kv) = invocation_id
+            && let Some(value) = kv.value.as_ref()
+            && let Some(Value::StringValue(id)) = value.value.as_ref()
+            && span.trace_id.len() == 16
+            && span.span_id.len() == 8
+        {
+            state.cache.push(
+                id.as_bytes().to_vec(),
+                (span.trace_id.clone(), span.span_id.clone()),
+            );
+        }
+    }
+
+    let logs = state
+        .logs
+        .resource_logs
+        .iter_mut()
+        .flat_map(|rl| rl.scope_logs.iter_mut())
+        .flat_map(|sl| sl.log_records.iter_mut());
+
+    for log in logs {
+        // This indicates we set the invocation ID as trace ID
+        if !log.trace_id.is_empty()
+            && log.trace_id.len() != 16
+            && let Some((trace_id, span_id)) = state.cache.get(&log.trace_id)
+        {
+            log.trace_id = trace_id.clone();
+            if log.span_id.is_empty() {
+                log.span_id = span_id.clone();
+            }
+        }
+    }
+
     tasks.spawn(send(
         mem::take(&mut state.traces),
         state.client.clone(),
@@ -297,6 +346,11 @@ pub async fn task(
 
         instance_id,
         attributes,
+        cache: LruCache::new(if config.managed {
+            const { NonZeroUsize::new(64).unwrap() }
+        } else {
+            const { NonZeroUsize::new(8).unwrap() }
+        }),
     };
 
     loop {

@@ -11,24 +11,31 @@ pub fn parse(record: String, observed: DateTime<Utc>) -> Option<LogRecord> {
     let observed_time: u64 = observed.timestamp_nanos_opt()?.try_into().ok()?;
 
     if let Ok(record) = serde_json::from_str::<JsonLogRecord>(&record) {
-        convert_json(record, observed_time, None, None)
-    } else if let Some((time, severity_text, message)) = parse_text(&record) {
+        convert_json(record, observed_time, None, None, None)
+    } else if let Some((time, request_id, severity_text, message)) = parse_text(&record) {
         if let Ok(record) = serde_json::from_str::<JsonLogRecord>(message) {
-            convert_json(record, observed_time, Some(time), Some(severity_text))
+            convert_json(
+                record,
+                observed_time,
+                Some(time),
+                Some(request_id),
+                Some(severity_text),
+            )
         } else {
             Some(convert_text(
                 message.to_string(),
                 observed_time,
                 Some(time),
+                Some(request_id),
                 Some(severity_text),
             ))
         }
     } else {
-        Some(convert_text(record, observed_time, None, None))
+        Some(convert_text(record, observed_time, None, None, None))
     }
 }
 
-fn parse_text(record: &str) -> Option<(u64, &str, &str)> {
+fn parse_text(record: &str) -> Option<(u64, &str, &str, &str)> {
     let (timestamp, rest) = record.split_once(' ')?;
     let time = DateTime::parse_from_rfc3339(timestamp)
         .ok()?
@@ -36,17 +43,17 @@ fn parse_text(record: &str) -> Option<(u64, &str, &str)> {
         .try_into()
         .ok()?;
 
-    let (_request_id, rest) = rest.split_once(' ')?;
-
+    let (request_id, rest) = rest.split_once(' ')?;
     let (severity_text, message) = rest.split_once(' ')?;
 
-    Some((time, severity_text, message))
+    Some((time, request_id, severity_text, message))
 }
 
 fn convert_json(
     record: JsonLogRecord,
     observed_time: u64,
     time: Option<u64>,
+    request_id: Option<&str>,
     severity_text: Option<&str>,
 ) -> Option<LogRecord> {
     let time = record
@@ -61,6 +68,12 @@ fn convert_json(
         .or_else(|| severity_text.map(|s| s.to_string()))
         .unwrap_or_default();
     let severity_number = severity_number(&severity_text).unwrap_or(0);
+
+    let trace_id = record
+        .trace_id
+        .or_else(|| record.request_id.map(|id| id.into_bytes()))
+        .or_else(|| request_id.map(|id| id.as_bytes().to_vec()))
+        .unwrap_or_default();
 
     let (body, attributes) = match record.message {
         Some(value) => {
@@ -106,9 +119,10 @@ fn convert_json(
         severity_text,
         severity_number,
         body: Some(body),
-        trace_id: record.trace_id.unwrap_or_default(),
+        trace_id,
         span_id: record.span_id.unwrap_or_default(),
         attributes,
+
         ..Default::default()
     })
 }
@@ -117,11 +131,16 @@ fn convert_text(
     record: String,
     observed_time: u64,
     time: Option<u64>,
+    request_id: Option<&str>,
     severity_text: Option<&str>,
 ) -> LogRecord {
     let time = time.unwrap_or(observed_time);
     let severity_text = severity_text.unwrap_or_default().to_string();
     let severity_number = severity_number(severity_text.as_str()).unwrap_or(0);
+
+    let trace_id = request_id
+        .map(|id| id.as_bytes().to_vec())
+        .unwrap_or_default();
 
     LogRecord {
         time_unix_nano: time,
@@ -131,6 +150,8 @@ fn convert_text(
         body: Some(AnyValue {
             value: Some(any_value::Value::StringValue(record)),
         }),
+        trace_id,
+
         ..Default::default()
     }
 }
@@ -203,6 +224,8 @@ fn convert_key_values(json: Map<String, Value>, complex: &mut bool) -> Vec<KeyVa
 struct JsonLogRecord {
     #[serde(alias = "time", default)]
     timestamp: Option<DateTime<FixedOffset>>,
+    #[serde(alias = "AWSRequestID", default)]
+    request_id: Option<String>,
     #[serde(default)]
     level: Option<String>,
 

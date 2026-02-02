@@ -36,15 +36,17 @@ pub fn parse(record: String, observed: DateTime<Utc>) -> Option<LogRecord> {
 }
 
 fn parse_text(record: &str) -> Option<(u64, &str, &str, &str)> {
-    let (timestamp, rest) = record.split_once(' ')?;
+    static DELIMITERS: &[char] = &[' ', '\t'];
+
+    let (timestamp, rest) = record.split_once(DELIMITERS)?;
     let time = DateTime::parse_from_rfc3339(timestamp)
         .ok()?
         .timestamp_nanos_opt()?
         .try_into()
         .ok()?;
 
-    let (request_id, rest) = rest.split_once(' ')?;
-    let (severity_text, message) = rest.split_once(' ')?;
+    let (request_id, rest) = rest.split_once(DELIMITERS)?;
+    let (severity_text, message) = rest.split_once(DELIMITERS)?;
 
     Some((time, request_id, severity_text, message))
 }

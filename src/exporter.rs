@@ -1,4 +1,4 @@
-use std::{future, mem, num::NonZeroUsize, sync::Arc, time::Instant};
+use std::{future, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll, time::Duration};
 
 use anyhow::Error;
 use bytes::BytesMut;
@@ -23,6 +23,7 @@ use prost::Message;
 use tokio::{
     sync::{mpsc, watch},
     task::JoinSet,
+    time::{self, MissedTickBehavior},
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tower::Service;
@@ -35,10 +36,12 @@ use crate::{
     util::{Client, body, flatten},
 };
 
+const INTERVAL: Duration = Duration::from_secs(60);
+const MAX_BUFFERED: usize = 8 * 1024 * 1024; // 8 MiB
+
 struct State {
     client: FollowRedirect<Client>,
     buffered: usize,
-    flushed: Instant,
 
     traces: ExportTraceServiceRequest,
     metrics: ExportMetricsServiceRequest,
@@ -319,7 +322,6 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
     });
 
     state.buffered = 0;
-    state.flushed = Instant::now();
 }
 
 pub async fn task(
@@ -334,7 +336,6 @@ pub async fn task(
     let mut state = State {
         client: FollowRedirect::new(client),
         buffered: 0,
-        flushed: Instant::now(),
 
         traces: ExportTraceServiceRequest::default(),
         metrics: ExportMetricsServiceRequest::default(),
@@ -347,16 +348,31 @@ pub async fn task(
         instance_id,
         attributes,
         cache: LruCache::new(if config.managed {
-            const { NonZeroUsize::new(64).unwrap() }
+            const { NonZeroUsize::new(1024).unwrap() }
         } else {
             const { NonZeroUsize::new(8).unwrap() }
         }),
     };
 
     loop {
-        let message = token.run_until_cancelled(rx.recv()).await.flatten();
+        let mut interval = time::interval(INTERVAL);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
-        match message {
+        let mut message = pin!(token.run_until_cancelled(rx.recv()));
+        let next = future::poll_fn(|cx| {
+            if let Poll::Ready(message) = message.as_mut().poll(cx) {
+                Poll::Ready(message.flatten())
+            } else if interval.poll_tick(cx).is_ready() && config.managed {
+                // Flush periodically for managed runtimes. We can set an empty
+                // request ID since nothing is waiting for flush notifications.
+                Poll::Ready(Some(ServiceRequest::Flush(String::new())))
+            } else {
+                Poll::Pending
+            }
+        })
+        .await;
+
+        match next {
             Some(ServiceRequest::Trace(request)) => {
                 state.buffered += request.encoded_len();
                 state.traces.resource_spans.extend(request.resource_spans);
@@ -379,6 +395,7 @@ pub async fn task(
 
             Some(ServiceRequest::Flush(id)) => {
                 export(&mut state, &config, Some(id));
+                continue;
             }
             // We're shutting down
             None => {
@@ -387,7 +404,7 @@ pub async fn task(
             }
         }
 
-        if state.flushed.elapsed().as_secs() > 60 || state.buffered >= 8 * 1024 * 1024 {
+        if state.buffered >= MAX_BUFFERED {
             export(&mut state, &config, None);
         }
     }

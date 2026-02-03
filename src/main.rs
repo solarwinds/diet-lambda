@@ -99,6 +99,8 @@ fn main() -> Result<(), Error> {
                 Some(NextEvent::Invoke(InvokeEvent { request_id, .. })) => {
                     // Wait until the exporter notifies us that the given
                     // request telemetry has been flushed.
+                    // This event isn't fired for the managed runtime, so we don't have
+                    // to worry about concurrency bugs here.
                     let done = token
                         .run_until_cancelled(watcher.wait_for(|id| {
                             id.as_ref().is_some_and(|current| current == &request_id)

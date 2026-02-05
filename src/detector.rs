@@ -17,6 +17,8 @@ pub fn detect(account_id: Option<String>) -> (Uuid, Arc<[KeyValue]>) {
     host::detect(&mut attributes);
     lambda::detect(&mut attributes, account_id);
 
+    eprintln!("detected resource attributes: {attributes:#?}");
+
     (Uuid::new_v4(), attributes.into())
 }
 

@@ -27,6 +27,8 @@ async fn telemetry(
                 flushes.push(request_id);
             }
             LambdaTelemetryRecord::Function(record) => {
+                eprintln!("raw log: {record}");
+
                 if let Some(log) = crate::logs::parse(record, event.time) {
                     logs.push(log);
                 }
@@ -36,6 +38,8 @@ async fn telemetry(
     }
 
     if !logs.is_empty() {
+        eprintln!("received logs: {logs:#?}");
+
         let _ = tx.send(ServiceRequest::Logs(ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
                 resource: Some(Resource::default()),

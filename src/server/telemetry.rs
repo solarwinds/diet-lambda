@@ -8,7 +8,7 @@ use opentelemetry_proto::tonic::{
 };
 use tokio::sync::mpsc;
 
-use crate::{ServiceRequest, env::Config};
+use crate::{ServiceRequest, env::Config, logs::LambdaLogRecord};
 
 pub fn router() -> Router<mpsc::UnboundedSender<ServiceRequest>> {
     Router::new().route(Config::TELEMETRY_ROUTE, post(telemetry))
@@ -16,7 +16,7 @@ pub fn router() -> Router<mpsc::UnboundedSender<ServiceRequest>> {
 
 async fn telemetry(
     State(tx): State<mpsc::UnboundedSender<ServiceRequest>>,
-    Json(events): Json<Vec<LambdaTelemetry>>,
+    Json(events): Json<Vec<LambdaTelemetry<LambdaLogRecord>>>,
 ) -> impl IntoResponse {
     let mut flushes = Vec::new();
     let mut logs = Vec::new();
@@ -27,8 +27,6 @@ async fn telemetry(
                 flushes.push(request_id);
             }
             LambdaTelemetryRecord::Function(record) => {
-                eprintln!("raw log: {record}");
-
                 if let Some(log) = crate::logs::parse(record, event.time) {
                     logs.push(log);
                 }
@@ -38,8 +36,6 @@ async fn telemetry(
     }
 
     if !logs.is_empty() {
-        eprintln!("received logs: {logs:#?}");
-
         let _ = tx.send(ServiceRequest::Logs(ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
                 resource: Some(Resource::default()),

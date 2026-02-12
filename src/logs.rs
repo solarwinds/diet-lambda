@@ -7,31 +7,34 @@ use opentelemetry_proto::tonic::{
 use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value};
 
-pub fn parse(record: String, observed: DateTime<Utc>) -> Option<LogRecord> {
+pub fn parse(record: LambdaLogRecord, observed: DateTime<Utc>) -> Option<LogRecord> {
     let observed_time: u64 = observed.timestamp_nanos_opt()?.try_into().ok()?;
 
-    if let Ok(record) = serde_json::from_str::<JsonLogRecord>(&record) {
-        convert_json(record, observed_time, None, None, None)
-    } else if let Some((time, request_id, severity_text, message)) = parse_text(&record) {
-        if let Ok(record) = serde_json::from_str::<JsonLogRecord>(message) {
-            convert_json(
-                record,
-                observed_time,
-                Some(time),
-                Some(request_id),
-                Some(severity_text),
-            )
-        } else {
-            Some(convert_text(
-                message.to_string(),
-                observed_time,
-                Some(time),
-                Some(request_id),
-                Some(severity_text),
-            ))
+    match record {
+        LambdaLogRecord::Json(record) => convert_json(record, observed_time, None, None, None),
+        LambdaLogRecord::Text(record) => {
+            if let Some((time, request_id, severity_text, message)) = parse_text(&record) {
+                if let Ok(record) = serde_json::from_str(message) {
+                    convert_json(
+                        record,
+                        observed_time,
+                        Some(time),
+                        Some(request_id),
+                        Some(severity_text),
+                    )
+                } else {
+                    Some(convert_text(
+                        message.to_string(),
+                        observed_time,
+                        Some(time),
+                        Some(request_id),
+                        Some(severity_text),
+                    ))
+                }
+            } else {
+                Some(convert_text(record, observed_time, None, None, None))
+            }
         }
-    } else {
-        Some(convert_text(record, observed_time, None, None, None))
     }
 }
 
@@ -222,8 +225,15 @@ fn convert_key_values(json: Map<String, Value>, complex: &mut bool) -> Vec<KeyVa
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+pub enum LambdaLogRecord {
+    Text(String),
+    Json(JsonLogRecord),
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct JsonLogRecord {
+pub struct JsonLogRecord {
     #[serde(alias = "time", default)]
     timestamp: Option<DateTime<FixedOffset>>,
     #[serde(alias = "AWSRequestID", default)]

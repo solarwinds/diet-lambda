@@ -53,7 +53,7 @@ struct State {
 
     instance_id: Uuid,
     attributes: Arc<[KeyValue]>,
-    /// Maps FaaS invocation IDs to trace and span IDs
+    /// Maps FaaS invocation IDs -> trace+span IDs
     cache: LruCache<Vec<u8>, (Vec<u8>, Vec<u8>)>,
 }
 
@@ -235,6 +235,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         .flat_map(|rs| rs.scope_spans.iter())
         .flat_map(|ss| ss.spans.iter());
 
+    // populate the cache with AWS request ID -> trace+span ID mappings
     for span in spans {
         let id = span
             .attributes
@@ -262,14 +263,16 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         .flat_map(|sl| sl.log_records.iter_mut());
 
     for log in logs {
-        // This indicates we set the invocation ID as trace ID
-        if !log.trace_id.is_empty()
-            && log.trace_id.len() != 16
-            && let Some((trace_id, span_id)) = state.cache.get(&log.trace_id)
-        {
-            log.trace_id = trace_id.clone();
-            if log.span_id.is_empty() {
-                log.span_id = span_id.clone();
+        // This indicates we set the request ID as trace ID
+        if !log.trace_id.is_empty() && log.trace_id.len() != 16 {
+            if let Some((trace_id, span_id)) = state.cache.get(&log.trace_id) {
+                log.trace_id = trace_id.clone();
+                if log.span_id.is_empty() {
+                    log.span_id = span_id.clone();
+                }
+            } else {
+                // Don't leave an invalid trace ID in for logs we fail to correlate
+                log.trace_id = Vec::new();
             }
         }
     }

@@ -74,48 +74,30 @@ fn convert_json(
         .unwrap_or_default();
     let severity_number = severity_number(&severity_text).unwrap_or(0);
 
+    // If there is no trace ID we use the AWS request ID instead
+    // in hopes of being able to correlate in the exporter
     let trace_id = record
         .trace_id
         .or_else(|| record.request_id.map(|id| id.into_bytes()))
         .or_else(|| request_id.map(|id| id.as_bytes().to_vec()))
         .unwrap_or_default();
 
-    let (body, attributes) = match record.message {
-        Some(value) => {
-            let message = convert_any_value(value, &mut true);
+    let body = AnyValue {
+        value: Some(any_value::Value::KvlistValue(KeyValueList {
+            values: {
+                let mut values = Vec::with_capacity(record.rest.len() + 1);
 
-            let mut complex = false;
-            let attributes = convert_key_values(record.rest, &mut complex);
+                if let Some(message) = record.message {
+                    values.push(KeyValue {
+                        key: "message".to_string(),
+                        value: Some(convert_any_value(message)),
+                    });
+                }
 
-            if complex {
-                let body = AnyValue {
-                    value: Some(any_value::Value::KvlistValue(KeyValueList {
-                        values: {
-                            let mut values = Vec::with_capacity(attributes.len() + 1);
-                            values.push(KeyValue {
-                                key: "message".to_string(),
-                                value: Some(message),
-                            });
-                            values.extend(attributes);
-                            values
-                        },
-                    })),
-                };
-
-                (body, Vec::new())
-            } else {
-                (message, attributes)
-            }
-        }
-        None => {
-            let body = AnyValue {
-                value: Some(any_value::Value::KvlistValue(KeyValueList {
-                    values: convert_key_values(record.rest, &mut false),
-                })),
-            };
-
-            (body, Vec::new())
-        }
+                values.extend(convert_key_values(record.rest));
+                values
+            },
+        })),
     };
 
     Some(LogRecord {
@@ -126,7 +108,6 @@ fn convert_json(
         body: Some(body),
         trace_id,
         span_id: record.span_id.unwrap_or_default(),
-        attributes,
 
         ..Default::default()
     })
@@ -173,7 +154,7 @@ fn severity_number(level: &str) -> Option<i32> {
     }
 }
 
-fn convert_any_value(json: Value, complex: &mut bool) -> AnyValue {
+fn convert_any_value(json: Value) -> AnyValue {
     match json {
         Value::Null => AnyValue { value: None },
         Value::Bool(value) => AnyValue {
@@ -189,6 +170,7 @@ fn convert_any_value(json: Value, complex: &mut bool) -> AnyValue {
                     value: Some(any_value::Value::DoubleValue(f)),
                 }
             } else {
+                // What
                 AnyValue { value: None }
             }
         }
@@ -196,18 +178,13 @@ fn convert_any_value(json: Value, complex: &mut bool) -> AnyValue {
             value: Some(any_value::Value::StringValue(value)),
         },
         Value::Array(values) => {
-            *complex = true;
-            let values = values
-                .into_iter()
-                .map(|value| convert_any_value(value, complex))
-                .collect();
+            let values = values.into_iter().map(convert_any_value).collect();
             AnyValue {
                 value: Some(any_value::Value::ArrayValue(ArrayValue { values })),
             }
         }
         Value::Object(values) => {
-            *complex = true;
-            let values = convert_key_values(values, complex);
+            let values = convert_key_values(values);
             AnyValue {
                 value: Some(any_value::Value::KvlistValue(KeyValueList { values })),
             }
@@ -215,11 +192,11 @@ fn convert_any_value(json: Value, complex: &mut bool) -> AnyValue {
     }
 }
 
-fn convert_key_values(json: Map<String, Value>, complex: &mut bool) -> Vec<KeyValue> {
+fn convert_key_values(json: Map<String, Value>) -> Vec<KeyValue> {
     json.into_iter()
         .map(|(k, v)| KeyValue {
             key: k,
-            value: Some(convert_any_value(v, complex)),
+            value: Some(convert_any_value(v)),
         })
         .collect()
 }

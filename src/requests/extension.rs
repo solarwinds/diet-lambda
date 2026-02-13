@@ -44,7 +44,7 @@ pub async fn register(client: &Client, config: &Config) -> Result<(String, Optio
         .to_string();
 
     let body = response.into_body().collect().await?.to_bytes();
-    let account_id = match serde_json::from_slice::<Response>(&body) {
+    let account_id = match serde_json::from_slice(&body) {
         Ok(Response { account_id }) => Some(account_id),
         _ => None,
     };

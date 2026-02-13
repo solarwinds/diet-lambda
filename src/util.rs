@@ -36,6 +36,8 @@ pub fn client() -> Client {
         .build(HttpsConnector::new())
 }
 
+// We listen on both ports for both protocols (HTTP and gRPC),
+// which uses less memory on top of being friendlier to typos
 pub struct MultiListener<const N: usize> {
     listeners: Box<[TcpListener; N]>,
 }

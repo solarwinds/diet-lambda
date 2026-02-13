@@ -52,6 +52,7 @@ fn main() -> Result<(), Error> {
         if token
             .run_until_cancelled(requests::telemetry::register(&client, &config, &id))
             .await
+            // Propagate request error upstream
             .transpose()?
             .is_none()
         {
@@ -93,6 +94,7 @@ fn main() -> Result<(), Error> {
             let next = token
                 .run_until_cancelled(requests::extension::next(&client, &config, &id))
                 .await
+                // Propagate request error upstream
                 .transpose()?;
 
             match next {
@@ -100,7 +102,7 @@ fn main() -> Result<(), Error> {
                     // Wait until the exporter notifies us that the given
                     // request telemetry has been flushed.
                     // This event isn't fired for the managed runtime, so we don't have
-                    // to worry about concurrency bugs here.
+                    // to worry about missing notifications because of concurrent requests.
                     let done = token
                         .run_until_cancelled(watcher.wait_for(|id| {
                             id.as_ref().is_some_and(|current| current == &request_id)

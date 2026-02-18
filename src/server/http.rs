@@ -28,7 +28,7 @@ pub fn router() -> Router<mpsc::UnboundedSender<ServiceRequest>> {
         .route(Config::METRICS_ROUTE, post(metrics))
         .route(Config::LOGS_ROUTE, post(logs))
         .route(Config::PROFILES_ROUTE, post(profiles))
-        .layer(DecompressionLayer::new().gzip(true))
+        .layer(DecompressionLayer::new().gzip(true).zstd(true))
 }
 
 async fn trace(

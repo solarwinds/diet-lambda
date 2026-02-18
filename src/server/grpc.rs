@@ -29,17 +29,24 @@ pub fn router(tx: mpsc::UnboundedSender<ServiceRequest>) -> Router {
 
     let mut builder = Routes::builder();
     builder.add_service(
-        TraceServiceServer::from_arc(service.clone()).accept_compressed(CompressionEncoding::Gzip),
+        TraceServiceServer::from_arc(service.clone())
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd),
     );
     builder.add_service(
         MetricsServiceServer::from_arc(service.clone())
-            .accept_compressed(CompressionEncoding::Gzip),
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd),
     );
     builder.add_service(
-        LogsServiceServer::from_arc(service.clone()).accept_compressed(CompressionEncoding::Gzip),
+        LogsServiceServer::from_arc(service.clone())
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd),
     );
     builder.add_service(
-        ProfilesServiceServer::from_arc(service).accept_compressed(CompressionEncoding::Gzip),
+        ProfilesServiceServer::from_arc(service)
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd),
     );
 
     builder.routes().into_axum_router()

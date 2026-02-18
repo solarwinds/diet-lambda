@@ -1,11 +1,16 @@
-use std::{future, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll, time::Duration};
+use std::{
+    future, io::Cursor, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll, time::Duration,
+};
 
 use anyhow::Error;
+use async_compression::{Level, tokio::bufread::GzipEncoder};
 use bytes::BytesMut;
-use http_body_util::{BodyExt, Full};
+use futures_util::TryStreamExt;
+use http_body_util::{BodyExt, StreamBody};
 use hyper::{
     Request,
-    header::{AUTHORIZATION, CONTENT_TYPE, USER_AGENT},
+    body::Frame,
+    header::{AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT},
 };
 use lru::LruCache;
 use opentelemetry_proto::tonic::{
@@ -25,7 +30,7 @@ use tokio::{
     task::JoinSet,
     time::{self, MissedTickBehavior},
 };
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::{io::ReaderStream, sync::CancellationToken, task::TaskTracker};
 use tower::Service;
 use tower_http::follow_redirect::FollowRedirect;
 use uuid::Uuid;
@@ -197,6 +202,14 @@ where
     let mut buf = BytesMut::with_capacity(request.encoded_len());
     request.encode(&mut buf)?;
 
+    let compressed = StreamBody::new(
+        ReaderStream::new(GzipEncoder::with_quality(
+            Cursor::new(buf),
+            Level::Precise(6),
+        ))
+        .map_ok(Frame::data),
+    );
+
     future::poll_fn(|cx| client.poll_ready(cx)).await?;
     let response = client
         .call(
@@ -204,9 +217,10 @@ where
                 .method("POST")
                 .uri(url)
                 .header(CONTENT_TYPE, "application/x-protobuf")
+                .header(CONTENT_ENCODING, "gzip")
                 .header(AUTHORIZATION, format!("Bearer {token}"))
                 .header(USER_AGENT, Config::USER_AGENT)
-                .body(body(Full::new(buf.freeze())))?,
+                .body(body(compressed))?,
         )
         .await?;
 

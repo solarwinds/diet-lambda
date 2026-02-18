@@ -4,6 +4,13 @@ use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Valu
 
 pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
     attributes.push(KeyValue {
+        key: "sw.cloud.aws.resource.type".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue("Lambda".to_string())),
+        }),
+    });
+
+    attributes.push(KeyValue {
         key: "cloud.provider".to_string(),
         value: Some(AnyValue {
             value: Some(Value::StringValue("aws".to_string())),

@@ -2,6 +2,12 @@ use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Valu
 
 pub fn detect(attributes: &mut Vec<KeyValue>) {
     attributes.push(KeyValue {
+        key: "sw.data.module".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue("apm".to_string())),
+        }),
+    });
+    attributes.push(KeyValue {
         key: "sw.apm.otelcol.version".to_string(),
         value: Some(AnyValue {
             value: Some(Value::StringValue(

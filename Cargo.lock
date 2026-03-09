@@ -657,7 +657,7 @@ dependencies = [
 [[package]]
 name = "lambda-extension"
 version = "1.0.2"
-source = "git+https://github.com/raphael-theriault-swi/aws-lambda-rust-runtime?branch=generic-logs#6b36b4526b3eda07a2a78fb749967a1d0e16129f"
+source = "git+https://github.com/aws/aws-lambda-rust-runtime#f0652ffd2c55cd8cfdebb9169e45f74d41056ef4"
 dependencies = [
  "async-stream",
  "chrono",
@@ -677,7 +677,7 @@ dependencies = [
 [[package]]
 name = "lambda_runtime_api_client"
 version = "1.0.2"
-source = "git+https://github.com/raphael-theriault-swi/aws-lambda-rust-runtime?branch=generic-logs#6b36b4526b3eda07a2a78fb749967a1d0e16129f"
+source = "git+https://github.com/aws/aws-lambda-rust-runtime#f0652ffd2c55cd8cfdebb9169e45f74d41056ef4"
 dependencies = [
  "bytes",
  "futures-channel",

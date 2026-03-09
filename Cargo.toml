@@ -28,7 +28,7 @@ hyper-util = { version = "0.1.19", features = [
     "http1",
     "http2",
 ] }
-lambda-extension = { git = "https://github.com/raphael-theriault-swi/aws-lambda-rust-runtime", branch = "generic-logs", default-features = false, features = [
+lambda-extension = { git = "https://github.com/aws/aws-lambda-rust-runtime", default-features = false, features = [
 ] }
 lru = { version = "0.16.3", default-features = false, features = [] }
 opentelemetry-proto = { version = "0.31.0", default-features = false, features = [

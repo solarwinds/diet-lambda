@@ -1,6 +1,9 @@
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
   checks:
@@ -32,7 +35,43 @@ jobs:
       - run: mkdir -p target/opt/extensions
       - run: cp target/release/diet-lambda target/opt/extensions/diet-lambda
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: diet-lambda-${{ matrix.arch }}
           path: target/opt
+
+  staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            lambda: x86_64
+          - arch: aarch64
+            lambda: arm64
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.LAMBDA_STAGE_PUBLISHER_ARN }}
+          aws-region: us-east-1
+
+      - uses: actions/download-artifact@v8
+        id: download
+        with:
+          name: diet-lambda-${{ matrix.arch }}
+          skip-decompress: true
+
+      - run: |
+          LAYER_ARN=$(
+            aws lambda publish-layer-version \
+              --layer-name diet-lambda-${{ matrix.lambda }} \
+              --license-info "Apache 2.0" \
+              --compatible-architectures ${{ matrix.lambda }} \
+              --zip-file fileb://${{ steps.download.outputs.artifact-path }} \
+              --query 'LayerVersionArn' \
+              --output text
+          )
+          echo "::notice::$LAYER_ARN"

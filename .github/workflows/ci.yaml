@@ -46,11 +46,10 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
-        include:
-          - arch: x86_64
-            lambda: x86_64
-          - arch: aarch64
-            lambda: arm64
+        arch: [x86_64, aarch64]
+
+    permissions:
+      id-token: write
 
     steps:
       - uses: aws-actions/configure-aws-credentials@v6
@@ -64,12 +63,13 @@ jobs:
           name: diet-lambda-${{ matrix.arch }}
           skip-decompress: true
 
-      - run: |
+      - name: Publish layer
+        run: |
           LAYER_ARN=$(
             aws lambda publish-layer-version \
-              --layer-name diet-lambda-${{ matrix.lambda }} \
+              --layer-name diet-lambda-${{ matrix.arch }} \
               --license-info "Apache 2.0" \
-              --compatible-architectures ${{ matrix.lambda }} \
+              --compatible-architectures ${{ matrix.arch == 'x86_64' && 'x86_64' || 'arm64' }} \
               --zip-file fileb://${{ steps.download.outputs.artifact-path }} \
               --query 'LayerVersionArn' \
               --output text

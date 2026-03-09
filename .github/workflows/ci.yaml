@@ -70,7 +70,7 @@ jobs:
               --layer-name diet-lambda-${{ matrix.arch }} \
               --license-info "Apache 2.0" \
               --compatible-architectures ${{ matrix.arch == 'x86_64' && 'x86_64' || 'arm64' }} \
-              --zip-file fileb://${{ steps.download.outputs.artifact-path }} \
+              --zip-file fileb://${{ steps.download.outputs.download-path }} \
               --query 'LayerVersionArn' \
               --output text
           )

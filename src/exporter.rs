@@ -277,8 +277,8 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         .flat_map(|sl| sl.log_records.iter_mut());
 
     for log in logs {
-        // This indicates we set the request ID as trace ID
         if !log.trace_id.is_empty() && log.trace_id.len() != 16 {
+            // This indicates we set the request ID as trace ID
             if let Some((trace_id, span_id)) = state.cache.get(&log.trace_id) {
                 log.trace_id = trace_id.clone();
                 if log.span_id.is_empty() {

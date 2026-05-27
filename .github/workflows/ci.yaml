@@ -137,4 +137,3 @@ jobs:
             --tag ghcr.io/${{ github.repository }}:latest \
             ghcr.io/${{ github.repository }}:x86_64 \
             ghcr.io/${{ github.repository }}:aarch64
-      - run: docker image push ghcr.io/${{ github.repository }}:latest

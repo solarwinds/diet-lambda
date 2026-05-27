@@ -91,6 +91,7 @@ fn convert_json(
                     values.push(KeyValue {
                         key: "message".to_string(),
                         value: Some(convert_any_value(message)),
+                        ..Default::default()
                     });
                 }
 
@@ -197,6 +198,7 @@ fn convert_key_values(json: Map<String, Value>) -> Vec<KeyValue> {
         .map(|(k, v)| KeyValue {
             key: k,
             value: Some(convert_any_value(v)),
+            ..Default::default()
         })
         .collect()
 }

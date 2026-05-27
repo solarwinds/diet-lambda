@@ -8,6 +8,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue("Lambda".to_string())),
         }),
+        ..Default::default()
     });
 
     attributes.push(KeyValue {
@@ -15,12 +16,14 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue("aws".to_string())),
         }),
+        ..Default::default()
     });
     attributes.push(KeyValue {
         key: "cloud.platform".to_string(),
         value: Some(AnyValue {
             value: Some(Value::StringValue("aws_lambda".to_string())),
         }),
+        ..Default::default()
     });
 
     let function_name = env::var("AWS_LAMBDA_FUNCTION_NAME").ok();
@@ -34,6 +37,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(function_name.clone())),
             }),
+            ..Default::default()
         });
     }
 
@@ -43,6 +47,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(account_id.clone())),
             }),
+            ..Default::default()
         });
     }
 
@@ -52,6 +57,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(region.clone())),
             }),
+            ..Default::default()
         });
     }
 
@@ -66,6 +72,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
                     "arn:aws:lambda:{region}:{account_id}:function:{function_name}"
                 ))),
             }),
+            ..Default::default()
         });
     }
 
@@ -75,6 +82,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(function_version)),
             }),
+            ..Default::default()
         });
     }
 
@@ -84,6 +92,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>, account_id: Option<String>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(service_name)),
             }),
+            ..Default::default()
         });
     }
 }

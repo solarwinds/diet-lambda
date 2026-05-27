@@ -26,6 +26,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(os.to_string())),
             }),
+            ..Default::default()
         });
     }
 
@@ -35,6 +36,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
             value: Some(AnyValue {
                 value: Some(Value::StringValue(arch.to_string())),
             }),
+            ..Default::default()
         });
     }
 }

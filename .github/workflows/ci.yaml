@@ -26,6 +26,9 @@ jobs:
     runs-on: ${{ matrix.arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     container: amazonlinux:2023
 
+    permissions:
+      contents: read
+
     steps:
       - run: dnf update -y && dnf install -y git tar gcc pkg-config openssl-devel
 
@@ -50,6 +53,7 @@ jobs:
         arch: [x86_64, aarch64]
 
     permissions:
+      contents: read
       id-token: write
 
     steps:
@@ -76,3 +80,60 @@ jobs:
               --output text
           )
           echo "::notice::$LAYER_ARN"
+
+  docker:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: diet-lambda-${{ matrix.arch }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}
+
+  multiarch:
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository }}:latest \
+            ghcr.io/${{ github.repository }}:x86_64 \
+            ghcr.io/${{ github.repository }}:aarch64

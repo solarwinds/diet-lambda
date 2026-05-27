@@ -41,6 +41,7 @@ pub fn augment(resource: &mut Resource, service_id: Uuid, attributes: &[KeyValue
                 value: Some(AnyValue {
                     value: Some(Value::StringValue(service_id.to_string())),
                 }),
+                ..Default::default()
             });
         }
     }

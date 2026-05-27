@@ -6,6 +6,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue("apm".to_string())),
         }),
+        ..Default::default()
     });
     attributes.push(KeyValue {
         key: "sw.apm.otelcol.version".to_string(),
@@ -14,6 +15,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
                 concat!(env!("CARGO_PKG_VERSION"), "+", env!("CARGO_PKG_NAME")).to_string(),
             )),
         }),
+        ..Default::default()
     });
 
     attributes.push(KeyValue {
@@ -21,6 +23,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue("rust".to_string())),
         }),
+        ..Default::default()
     });
 
     attributes.push(KeyValue {
@@ -28,6 +31,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue(env!("CARGO_PKG_NAME").to_string())),
         }),
+        ..Default::default()
     });
 
     attributes.push(KeyValue {
@@ -35,5 +39,6 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
         value: Some(AnyValue {
             value: Some(Value::StringValue(env!("CARGO_PKG_VERSION").to_string())),
         }),
+        ..Default::default()
     });
 }

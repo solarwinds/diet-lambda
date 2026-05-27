@@ -107,7 +107,6 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: diet-lambda-${{ matrix.arch }}
-      - run: ls -lAhR
 
       - uses: docker/build-push-action@v7
         with:

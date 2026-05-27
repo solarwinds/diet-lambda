@@ -1,2 +1,2 @@
 FROM amazonlinux
-COPY ./extensions/diet-lambda /opt/extensions/diet-lambda
+COPY --chmod=755 ./extensions/diet-lambda /opt/extensions/diet-lambda

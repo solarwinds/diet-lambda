@@ -8,6 +8,17 @@ The collector listens for `HTTP/OTLP`, `HTTP/JSON` and `gRPC/OTLP` traces, metri
 
 This collector uses the same `SW_APM_API_TOKEN` and `SW_APM_DATA_CENTER` environment variables as the full collector. It does not support configuration via a `yaml` file, or any custom processing logic.
 
+## Docker Images
+
+These are also updated on new commits to main. The collector is built on Amazon Linux and expects OpenSSL to be available in the image.
+
+```dockerfile
+FROM ghcr.io/solarwinds/diet-lambda AS collector
+# ...
+COPY --from=collector /opt/extensions/diet-lambda /opt/extensions/diet-lambda
+# ...
+```
+
 ## Staging ARNs
 
 These are updated on new commits to `main`, or manually by triggering CI workflow.

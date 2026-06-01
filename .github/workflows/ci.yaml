@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  SUFFIX: ${{ (github.head_ref || github.ref_name) == 'main' && '' || format('-{0}', replace(github.head_ref || github.ref_name, '[^0-9A-Za-z_-]', '-')) }}
+  SUFFIX: ${{ (github.head_ref || github.ref_name) == 'main' && '' || format('-{0}', github.head_ref || github.ref_name) }}
+
 jobs:
   checks:
     runs-on: ubuntu-latest

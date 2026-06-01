@@ -115,7 +115,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}$SUFFIX
+          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}${{ env.SUFFIX }}
 
   multiarch:
     needs: docker

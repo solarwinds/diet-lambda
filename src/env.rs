@@ -133,10 +133,16 @@ impl Config {
             });
 
         let data_center = sw_apm_data_center.unwrap_or_else(|| "na-01".to_string());
-        let collector = sw_apm_collector
+        let mut collector = sw_apm_collector
             .unwrap_or_else(|| format!("https://apm.collector.{data_center}.cloud.solarwinds.com"));
-        let exporter = sw_exporter_otlp_endpoint
+        let mut exporter = sw_exporter_otlp_endpoint
             .unwrap_or_else(|| collector.replace("apm.collector", "otel.collector"));
+
+        for url in [&mut collector, &mut exporter] {
+            if !url.starts_with("https://") && !url.starts_with("http://") {
+                *url = format!("https://{url}");
+            }
+        }
 
         let executable = env::current_exe()
             .ok()

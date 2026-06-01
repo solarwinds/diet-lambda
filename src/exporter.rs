@@ -3,7 +3,10 @@ use std::{
 };
 
 use anyhow::Error;
-use async_compression::{Level, tokio::bufread::GzipEncoder};
+use async_compression::{
+    Level,
+    tokio::bufread::{GzipEncoder, ZstdEncoder},
+};
 use bytes::BytesMut;
 use futures_util::TryStreamExt;
 use http_body_util::{BodyExt, StreamBody};
@@ -26,6 +29,7 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 use tokio::{
+    io::AsyncRead,
     sync::{mpsc, watch},
     task::JoinSet,
     time::{self, MissedTickBehavior},
@@ -37,7 +41,7 @@ use uuid::Uuid;
 
 use crate::{
     ServiceRequest,
-    env::Config,
+    env::{Compression, Config},
     util::{Client, body, flatten},
 };
 
@@ -185,6 +189,7 @@ async fn send<R>(
     mut client: FollowRedirect<Client>,
     url: String,
     token: String,
+    compression: Compression,
     instance_id: Uuid,
     attributes: Arc<[KeyValue]>,
 ) -> Result<(), Error>
@@ -202,13 +207,23 @@ where
     let mut buf = BytesMut::with_capacity(request.encoded_len());
     request.encode(&mut buf)?;
 
-    let compressed = StreamBody::new(
-        ReaderStream::new(GzipEncoder::with_quality(
-            Cursor::new(buf),
-            Level::Precise(6),
-        ))
-        .map_ok(Frame::data),
-    );
+    let (boxed, encoding): (Box<dyn AsyncRead + Unpin + Send>, &str) = match compression {
+        Compression::Zstd => (
+            Box::new(ZstdEncoder::with_quality(
+                Cursor::new(buf),
+                Level::Precise(4),
+            )),
+            "zstd",
+        ),
+        Compression::Gzip => (
+            Box::new(GzipEncoder::with_quality(
+                Cursor::new(buf),
+                Level::Precise(6),
+            )),
+            "gzip",
+        ),
+    };
+    let compressed = StreamBody::new(ReaderStream::new(boxed).map_ok(Frame::data));
 
     future::poll_fn(|cx| client.poll_ready(cx)).await?;
     let response = client
@@ -217,7 +232,7 @@ where
                 .method("POST")
                 .uri(url)
                 .header(CONTENT_TYPE, "application/x-protobuf")
-                .header(CONTENT_ENCODING, "gzip")
+                .header(CONTENT_ENCODING, encoding)
                 .header(AUTHORIZATION, format!("Bearer {token}"))
                 .header(USER_AGENT, Config::USER_AGENT)
                 .body(body(compressed))?,
@@ -296,6 +311,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.traces.clone(),
         config.token.clone(),
+        config.compression,
         state.instance_id,
         state.attributes.clone(),
     ));
@@ -305,6 +321,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.metrics.clone(),
         config.token.clone(),
+        config.compression,
         state.instance_id,
         state.attributes.clone(),
     ));
@@ -314,6 +331,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
         state.client.clone(),
         config.urls.exporters.logs.clone(),
         config.token.clone(),
+        config.compression,
         state.instance_id,
         state.attributes.clone(),
     ));
@@ -324,6 +342,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
             state.client.clone(),
             config.urls.exporters.profiles.clone(),
             config.token.clone(),
+            config.compression,
             state.instance_id,
             state.attributes.clone(),
         ));

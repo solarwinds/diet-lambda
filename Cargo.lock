@@ -269,6 +269,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "const-hex",
+ "envy",
  "flate2",
  "futures-util",
  "http-body-util",
@@ -306,6 +307,15 @@ name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
+
+[[package]]
+name = "envy"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "equivalent"

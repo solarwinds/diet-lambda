@@ -8,6 +8,11 @@ The collector listens for `HTTP/OTLP`, `HTTP/JSON` and `gRPC/OTLP` traces, metri
 
 This collector uses the same `SW_APM_API_TOKEN` and `SW_APM_DATA_CENTER` environment variables as the full collector. It does not support configuration via a `yaml` file, or any custom processing logic.
 
+- Service name - `OTEL_SERVICE_NAME` -> `SW_APM_SERVICE_KEY` -> `AWS_LAMBDA_FUNCTION_NAME`
+- API token - `SW_APM_API_TOKEN` -> `SW_APM_SERVICE_KEY`
+- APM collector endpoint - `SW_APM_COLLECTOR` -> `SW_APM_DATA_CENTER`
+- OTLP exporter endpoints - `SW_EXPORTER_OTLP_$signal_ENDPOINT` -> `SW_EXPORTER_OTLP_ENDPOINT` -> `SW_APM_COLLECTOR` -> `SW_APM_DATA_CENTER`
+
 ## Docker Images
 
 These are also updated on new commits to main. The collector is built on Amazon Linux and expects OpenSSL to be available in the image.

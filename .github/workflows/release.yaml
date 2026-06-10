@@ -129,12 +129,10 @@ jobs:
           name: diet-lambda-${{ matrix.arch }}
 
       - uses: docker/build-push-action@v7
-        env:
-          SUFFIX: -${{ needs.build.outputs.version }}
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}${{ env.SUFFIX }}
+          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}-${{ needs.build.outputs.version }}
 
   multiarch:
     needs:

@@ -6,6 +6,28 @@ use std::{
 };
 
 use anyhow::{Context, Error};
+use serde::Deserialize;
+
+#[derive(Deserialize, Default)]
+pub struct Env {
+    otel_service_name: Option<String>,
+    aws_lambda_function_name: Option<String>,
+
+    aws_lambda_initialization_type: Option<String>,
+    aws_lambda_runtime_api: Option<String>,
+    sw_exporter_compression: Option<String>,
+
+    sw_apm_api_token: Option<String>,
+    sw_apm_service_key: Option<String>,
+
+    sw_apm_data_center: Option<String>,
+    sw_apm_collector: Option<String>,
+    sw_exporter_otlp_endpoint: Option<String>,
+    sw_exporter_otlp_traces_endpoint: Option<String>,
+    sw_exporter_otlp_metrics_endpoint: Option<String>,
+    sw_exporter_otlp_logs_endpoint: Option<String>,
+    sw_exporter_otlp_profiles_endpoint: Option<String>,
+}
 
 pub struct Config {
     pub _service: String,
@@ -13,8 +35,15 @@ pub struct Config {
 
     pub executable: String,
     pub managed: bool,
+    pub compression: Compression,
 
     pub urls: UrlsConfig,
+}
+
+#[derive(Clone, Copy)]
+pub enum Compression {
+    Gzip,
+    Zstd,
 }
 
 pub struct UrlsConfig {
@@ -65,28 +94,55 @@ impl Config {
     const LOCAL_HOST: &str = "sandbox.localdomain";
 
     pub fn parse() -> Result<Arc<Self>, Error> {
-        let service_key = env::var("SW_APM_SERVICE_KEY").ok();
-        let service_key = service_key.as_ref().and_then(|s| s.split_once(':'));
+        let Env {
+            otel_service_name,
+            aws_lambda_function_name,
 
-        let service_name = env::var("OTEL_SERVICE_NAME")
-            .ok()
+            aws_lambda_initialization_type,
+            aws_lambda_runtime_api,
+            sw_exporter_compression,
+
+            sw_apm_api_token,
+            sw_apm_service_key,
+
+            sw_apm_data_center,
+            sw_apm_collector,
+            sw_exporter_otlp_endpoint,
+            sw_exporter_otlp_traces_endpoint,
+            sw_exporter_otlp_metrics_endpoint,
+            sw_exporter_otlp_logs_endpoint,
+            sw_exporter_otlp_profiles_endpoint,
+        } = envy::from_env().unwrap_or_default();
+
+        let service_key = sw_apm_service_key.as_ref().and_then(|s| s.split_once(':'));
+
+        let service_name = otel_service_name
             .or_else(|| service_key.map(|(name, _)| name.to_string()))
-            .or_else(|| env::var("AWS_LAMBDA_FUNCTION_NAME").ok())
+            .or(aws_lambda_function_name)
             .context("missing service name")?;
 
-        let api_token = env::var("SW_APM_API_TOKEN")
-            .ok()
-            .or_else(|| service_key.map(|(_, token)| token.to_string())).unwrap_or_else(|| {
+        let managed =
+            aws_lambda_initialization_type.is_some_and(|v| v == "lambda-managed-instances");
+        let api_host = aws_lambda_runtime_api.unwrap_or_else(|| Self::API_HOST.to_string());
+
+        let api_token = sw_apm_api_token
+            .or_else(|| service_key.map(|(_, token)| token.to_string()))
+            .unwrap_or_else(|| {
                 eprintln!("Missing SolarWinds APM API token. Please set the `SW_APM_API_TOKEN` environment variable to enable sampling.");
                 "missing".to_string()
             });
 
-        let data_center = env::var("SW_APM_DATA_CENTER")
-            .ok()
-            .unwrap_or_else(|| "na-01".to_string());
+        let data_center = sw_apm_data_center.unwrap_or_else(|| "na-01".to_string());
+        let mut collector = sw_apm_collector
+            .unwrap_or_else(|| format!("https://apm.collector.{data_center}.cloud.solarwinds.com"));
+        let mut exporter = sw_exporter_otlp_endpoint
+            .unwrap_or_else(|| collector.replace("apm.collector", "otel.collector"));
 
-        let api_host =
-            env::var("AWS_LAMBDA_RUNTIME_API").unwrap_or_else(|_| Self::API_HOST.to_string());
+        for url in [&mut collector, &mut exporter] {
+            if !url.starts_with("https://") && !url.starts_with("http://") {
+                *url = format!("https://{url}");
+            }
+        }
 
         let executable = env::current_exe()
             .ok()
@@ -96,31 +152,26 @@ impl Config {
             })
             .unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string());
 
-        let managed = env::var("AWS_LAMBDA_INITIALIZATION_TYPE")
-            .is_ok_and(|v| v == "lambda-managed-instances");
+        let compression = sw_exporter_compression
+            .and_then(|c| match c.to_lowercase().trim() {
+                "gzip" | "gz" => Some(Compression::Gzip),
+                "zstd" => Some(Compression::Zstd),
+                _ => None,
+            })
+            .unwrap_or(Compression::Gzip);
 
         Ok(Arc::new(Self {
             urls: UrlsConfig {
-                settings: format!(
-                    "https://apm.collector.{data_center}.cloud.solarwinds.com/v1/settings/{service_name}/{service_name}",
-                ),
+                settings: format!("{collector}/v1/settings/{service_name}/{service_name}",),
                 exporters: ExportersUrlsConfig {
-                    traces: format!(
-                        "https://otel.collector.{data_center}.cloud.solarwinds.com{}",
-                        Self::TRACES_ROUTE
-                    ),
-                    metrics: format!(
-                        "https://otel.collector.{data_center}.cloud.solarwinds.com{}",
-                        Self::METRICS_ROUTE
-                    ),
-                    logs: format!(
-                        "https://otel.collector.{data_center}.cloud.solarwinds.com{}",
-                        Self::LOGS_ROUTE
-                    ),
-                    profiles: format!(
-                        "https://otel.collector.{data_center}.cloud.solarwinds.com{}",
-                        Self::PROFILES_ROUTE
-                    ),
+                    traces: sw_exporter_otlp_traces_endpoint
+                        .unwrap_or_else(|| format!("{exporter}{}", Self::TRACES_ROUTE)),
+                    metrics: sw_exporter_otlp_metrics_endpoint
+                        .unwrap_or_else(|| format!("{exporter}{}", Self::METRICS_ROUTE)),
+                    logs: sw_exporter_otlp_logs_endpoint
+                        .unwrap_or_else(|| format!("{exporter}{}", Self::LOGS_ROUTE)),
+                    profiles: sw_exporter_otlp_profiles_endpoint
+                        .unwrap_or_else(|| format!("{exporter}{}", Self::PROFILES_ROUTE)),
                 },
                 extension: ExtensionUrlsConfig {
                     register: format!(
@@ -151,6 +202,7 @@ impl Config {
 
             executable,
             managed,
+            compression,
         }))
     }
 }

@@ -37,15 +37,14 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          cargo pkgid
-          VERSION=$(awk '{ n = split($0, a, "#"); print a[n] }')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          MAJOR=$(echo $VERSION | awk -F. '{ print $1 }')
-          MINOR=$(echo $VERSION | awk -F. '{ print $2 }')
-          PATCH=$(echo $VERSION | awk -F. '{ print $3 }')
-          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
-          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
-          echo "PATCH=$PATCH" >> $GITHUB_OUTPUT
+          VERSION="$(cargo pkgid | awk -F'#' '{print $NF}')"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          MAJOR="$(echo "$VERSION" | awk -F. '{ print $1 }')"
+          MINOR="$(echo "$VERSION" | awk -F. '{ print $2 }')"
+          PATCH="$(echo "$VERSION" | awk -F. '{ print $3 }')"
+          echo "MAJOR=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "MINOR=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "PATCH=$PATCH" >> "$GITHUB_OUTPUT"
 
   prod:
     needs: build

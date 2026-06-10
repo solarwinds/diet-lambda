@@ -13,16 +13,12 @@ This collector uses the same `SW_APM_API_TOKEN` and `SW_APM_DATA_CENTER` environ
 - APM collector endpoint - `SW_APM_COLLECTOR` -> `SW_APM_DATA_CENTER`
 - OTLP exporter endpoints - `SW_EXPORTER_OTLP_$signal_ENDPOINT` -> `SW_EXPORTER_OTLP_ENDPOINT` -> `SW_APM_COLLECTOR` -> `SW_APM_DATA_CENTER`
 
-## Docker Images
+## Production ARNs
 
-These are also updated on new commits to main. The collector is built on Amazon Linux and expects OpenSSL to be available in the image.
+These are published on release.
 
-```dockerfile
-FROM ghcr.io/solarwinds/diet-lambda AS collector
-# ...
-COPY --from=collector /opt/extensions/diet-lambda /opt/extensions/diet-lambda
-# ...
-```
+- `arn:aws:lambda:<region>:851060098468:layer:diet-lambda-x86_64-x_y_z`
+- `arn:aws:lambda:<region>:851060098468:layer:diet-lambda-aarch64-x_y_z`
 
 ## Staging ARNs
 
@@ -30,6 +26,17 @@ These are updated on new commits to `main`, or manually by triggering CI workflo
 
 - `arn:aws:lambda:us-east-1:858939916050:layer:diet-lambda-x86_64`
 - `arn:aws:lambda:us-east-1:858939916050:layer:diet-lambda-aarch64`
+
+## Docker Images
+
+The `latest` tag tracks changes to `main`, and the `x`, `x.y` and `x.y.z` tags track point releases. The collector is built on Amazon Linux and expects OpenSSL to be available in the image.
+
+```dockerfile
+FROM ghcr.io/solarwinds/diet-lambda:x.y.z AS collector
+# ...
+COPY --from=collector /opt/extensions/diet-lambda /opt/extensions/diet-lambda
+# ...
+```
 
 ## Developing
 

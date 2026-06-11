@@ -1,0 +1,169 @@
+name: Release
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      major: ${{ steps.version.outputs.MAJOR }}
+      minor: ${{ steps.version.outputs.MINOR }}
+      patch: ${{ steps.version.outputs.PATCH }}
+
+    runs-on: ${{ matrix.arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    container: amazonlinux:2023
+
+    permissions:
+      contents: read
+
+    steps:
+      - run: dnf update -y && dnf install -y git tar awk gcc pkg-config openssl-devel
+
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - run: cargo build --release
+      - run: mkdir -p target/opt/extensions
+      - run: cp target/release/diet-lambda target/opt/extensions/diet-lambda
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: diet-lambda-${{ matrix.arch }}
+          path: target/opt
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="$(cargo pkgid | awk -F'#' '{print $NF}')"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          MAJOR="$(echo "$VERSION" | awk -F. '{ print $1 }')"
+          MINOR="$(echo "$VERSION" | awk -F. '{ print $2 }')"
+          PATCH="$(echo "$VERSION" | awk -F. '{ print $3 }')"
+          echo "MAJOR=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "MINOR=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "PATCH=$PATCH" >> "$GITHUB_OUTPUT"
+
+  prod:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+        region:
+          - ap-northeast-1
+          - ap-northeast-2
+          - ap-south-1
+          - ap-southeast-1
+          - ap-southeast-2
+          - ca-central-1
+          - eu-central-1
+          - eu-north-1
+          - eu-west-1
+          - eu-west-2
+          - eu-west-3
+          - sa-east-1
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.LAMBDA_PROD_PUBLISHER_ARN }}
+          aws-region: ${{ matrix.region }}
+
+      - uses: actions/download-artifact@v8
+        id: download
+        with:
+          name: diet-lambda-${{ matrix.arch }}
+          skip-decompress: true
+
+      - name: Publish layer
+        env:
+          SUFFIX: -${{ needs.build.outputs.major }}_${{ needs.build.outputs.minor }}_${{ needs.build.outputs.patch }}
+        run: |
+          LAYER_ARN=$(
+            aws lambda publish-layer-version \
+              --layer-name diet-lambda-${{ matrix.arch }}$SUFFIX \
+              --license-info "Apache 2.0" \
+              --compatible-architectures ${{ matrix.arch == 'x86_64' && 'x86_64' || 'arm64' }} \
+              --zip-file fileb://${{ steps.download.outputs.download-path }}/diet-lambda-${{ matrix.arch }}.zip \
+              --query 'LayerVersionArn' \
+              --output text
+          )
+          echo "::notice::$LAYER_ARN"
+
+  docker:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: diet-lambda-${{ matrix.arch }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ matrix.arch }}-${{ needs.build.outputs.version }}
+
+  multiarch:
+    needs:
+      - build
+      - docker
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifests
+        env:
+          SUFFIX: -${{ needs.build.outputs.version }}
+          MAJOR: ${{ needs.build.outputs.major }}
+          MINOR: ${{ needs.build.outputs.major }}.${{ needs.build.outputs.minor }}
+          PATCH: ${{ needs.build.outputs.major }}.${{ needs.build.outputs.minor }}.${{ needs.build.outputs.patch }}
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository }}:$MAJOR \
+            --tag ghcr.io/${{ github.repository }}:$MINOR \
+            --tag ghcr.io/${{ github.repository }}:$PATCH \
+            ghcr.io/${{ github.repository }}:x86_64$SUFFIX \
+            ghcr.io/${{ github.repository }}:aarch64$SUFFIX

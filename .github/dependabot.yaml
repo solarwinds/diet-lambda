@@ -8,6 +8,5 @@ updates:
 
   - package-ecosystem: cargo
     directory: "/"
-    versioning-strategy: increase
     schedule:
       interval: weekly

@@ -29,6 +29,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::Status,
 };
 use prost::Message;
+use secrecy::{ExposeSecret, SecretString};
 use tokio::{
     io::AsyncRead,
     sync::{mpsc, watch},
@@ -185,7 +186,7 @@ async fn send<R>(
     mut request: R,
     mut client: FollowRedirect<Client>,
     url: String,
-    token: String,
+    token: SecretString,
     compression: Compression,
     instance_id: Uuid,
     attributes: Arc<[KeyValue]>,
@@ -231,7 +232,7 @@ where
                 .uri(url)
                 .header(CONTENT_TYPE, "application/x-protobuf")
                 .header(CONTENT_ENCODING, encoding)
-                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header(AUTHORIZATION, format!("Bearer {}", token.expose_secret()))
                 .header(USER_AGENT, Config::USER_AGENT)
                 .body(body(compressed))?,
         )

@@ -6,6 +6,7 @@ use hyper::{
     Request,
     header::{AUTHORIZATION, USER_AGENT},
 };
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use tokio::{
     fs,
@@ -25,7 +26,10 @@ async fn fetch(client: &Client, config: &Config) -> Result<Vec<u8>, Error> {
             Request::builder()
                 .method("GET")
                 .uri(&config.urls.settings)
-                .header(AUTHORIZATION, format!("Bearer {}", config.token))
+                .header(
+                    AUTHORIZATION,
+                    format!("Bearer {}", config.token.expose_secret()),
+                )
                 .header(USER_AGENT, Config::USER_AGENT)
                 .body(body(Empty::new()))?,
         )

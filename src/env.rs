@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Error};
+use secrecy::SecretString;
 use serde::Deserialize;
 
 #[derive(Deserialize, Default)]
@@ -32,7 +33,7 @@ pub struct Env {
 #[derive(Debug)]
 pub struct Config {
     pub _service: String,
-    pub token: String,
+    pub token: SecretString,
 
     pub executable: String,
     pub managed: bool,
@@ -204,7 +205,7 @@ impl Config {
             },
 
             _service: service_name,
-            token: api_token,
+            token: api_token.into(),
 
             executable,
             managed,

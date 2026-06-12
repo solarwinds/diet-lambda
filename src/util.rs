@@ -47,6 +47,9 @@ impl<const N: usize> MultiListener<N> {
         let mut listeners = Vec::with_capacity(N);
         for address in addresses {
             let listener = TcpListener::bind(address).await?;
+            if let Ok(addr) = listener.local_addr() {
+                tracing::info!(addr = %addr, "extension listening");
+            }
             listeners.push(listener);
         }
 

@@ -94,10 +94,10 @@ impl OtlpResponse for ExportTraceServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_spans > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} traces: {message}",
-                n = partial.rejected_spans,
+            tracing::warn!(
                 message = partial.error_message,
+                "failed to export {n} traces",
+                n = partial.rejected_spans,
             );
         }
     }
@@ -121,10 +121,10 @@ impl OtlpResponse for ExportMetricsServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_data_points > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} metrics: {message}",
-                n = partial.rejected_data_points,
+            tracing::warn!(
                 message = partial.error_message,
+                "failed to export {n} metrics",
+                n = partial.rejected_data_points,
             );
         }
     }
@@ -148,10 +148,10 @@ impl OtlpResponse for ExportLogsServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_log_records > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} logs: {message}",
-                n = partial.rejected_log_records,
+            tracing::warn!(
                 message = partial.error_message,
+                "failed to export {n} logs",
+                n = partial.rejected_log_records,
             );
         }
     }
@@ -175,10 +175,10 @@ impl OtlpResponse for ExportProfilesServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_profiles > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} profiles: {message}",
-                n = partial.rejected_profiles,
+            tracing::warn!(
                 message = partial.error_message,
+                "failed to export {n} profiles",
+                n = partial.rejected_profiles,
             );
         }
     }
@@ -245,14 +245,15 @@ where
     if let Ok(res) = R::Response::decode(body.as_ref()) {
         res.log();
     } else if let Ok(status) = Status::decode(body.as_ref()) {
-        eprintln!("failed to export telemetry: {}", status.message);
+        tracing::warn!(status = status.message, "failed to export telemetry");
     } else {
-        eprintln!("invalid response from collector: {:#?}", parts);
+        tracing::warn!(res = ?parts, "invalid response from collector");
     }
 
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 fn export(state: &mut State, config: &Config, id: Option<String>) {
     let notifier = state.notifier.clone();
     let mut tasks = JoinSet::new();
@@ -351,7 +352,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
     state.tracker.spawn(async move {
         while let Some(result) = tasks.join_next().await {
             if let Err(err) = flatten(result) {
-                eprintln!("failed to export telemetry: {err}");
+                tracing::warn!(%err, "failed to export telemetry");
             }
         }
         let _ = notifier.send(id);

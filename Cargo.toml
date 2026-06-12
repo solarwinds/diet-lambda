@@ -60,9 +60,25 @@ tonic = { version = "0.14.2", default-features = false, features = [
 ] }
 tower = { version = "0.5.2", features = [] }
 tower-http = { version = "0.6.8", features = [
+    "trace",
     "decompression-gzip",
     "decompression-zstd",
     "follow-redirect",
+] }
+tracing = { version = "0.1.44", default-features = false, features = [
+    "std",
+    "log",
+    "attributes",
+    "async-await",
+    "release_max_level_debug",
+] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = [
+    "std",
+    "fmt",
+    "json",
+    "env-filter",
+    "tracing-log",
+    "smallvec",
 ] }
 uuid = { version = "1.20.0", features = ["v4"] }
 

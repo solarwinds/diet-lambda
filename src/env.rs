@@ -93,6 +93,7 @@ impl Config {
     const API_HOST: &str = "localhost:9001";
     const LOCAL_HOST: &str = "sandbox.localdomain";
 
+    #[tracing::instrument(level = "debug", err)]
     pub fn parse() -> Result<Arc<Self>, Error> {
         let Env {
             otel_service_name,

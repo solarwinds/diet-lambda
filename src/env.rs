@@ -29,6 +29,7 @@ pub struct Env {
     sw_exporter_otlp_profiles_endpoint: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub _service: String,
     pub token: String,
@@ -40,12 +41,13 @@ pub struct Config {
     pub urls: UrlsConfig,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Compression {
     Gzip,
     Zstd,
 }
 
+#[derive(Debug)]
 pub struct UrlsConfig {
     pub settings: String,
     pub exporters: ExportersUrlsConfig,
@@ -53,6 +55,7 @@ pub struct UrlsConfig {
     pub telemetry: TelemetryUrlsConfig,
 }
 
+#[derive(Debug)]
 pub struct ExportersUrlsConfig {
     pub traces: String,
     pub metrics: String,
@@ -60,6 +63,7 @@ pub struct ExportersUrlsConfig {
     pub profiles: String,
 }
 
+#[derive(Debug)]
 pub struct ExtensionUrlsConfig {
     pub register: String,
     pub event: String,
@@ -67,6 +71,7 @@ pub struct ExtensionUrlsConfig {
     pub exit_error: String,
 }
 
+#[derive(Debug)]
 pub struct TelemetryUrlsConfig {
     pub register: String,
     pub endpoint: String,
@@ -93,7 +98,7 @@ impl Config {
     const API_HOST: &str = "localhost:9001";
     const LOCAL_HOST: &str = "sandbox.localdomain";
 
-    #[tracing::instrument(level = "debug", err)]
+    #[tracing::instrument(level = "debug", err, ret)]
     pub fn parse() -> Result<Arc<Self>, Error> {
         let Env {
             otel_service_name,

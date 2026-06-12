@@ -10,7 +10,7 @@ mod host;
 mod lambda;
 mod sdk;
 
-#[tracing::instrument(level = "debug")]
+#[tracing::instrument(level = "debug", ret, skip_all)]
 pub fn detect(account_id: Option<String>) -> (Uuid, Arc<[KeyValue]>) {
     let mut attributes = Vec::new();
 

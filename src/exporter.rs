@@ -1,5 +1,6 @@
 use std::{
-    future, io::Cursor, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll, time::Duration,
+    fmt::Debug, future, io::Cursor, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll,
+    time::Duration,
 };
 
 use anyhow::Error;
@@ -66,7 +67,7 @@ struct State {
     cache: LruCache<Vec<u8>, (Vec<u8>, Vec<u8>)>,
 }
 
-trait OtlpRequest: Message {
+trait OtlpRequest: Message + Debug {
     type Response: OtlpResponse;
 
     fn is_empty(&self) -> bool;
@@ -95,9 +96,8 @@ impl OtlpResponse for ExportTraceServiceResponse {
             && (partial.rejected_spans > 0 || !partial.error_message.is_empty())
         {
             tracing::warn!(
-                message = partial.error_message,
-                "failed to export {n} traces",
-                n = partial.rejected_spans,
+                err = ?partial,
+                "failed to export traces",
             );
         }
     }
@@ -122,9 +122,8 @@ impl OtlpResponse for ExportMetricsServiceResponse {
             && (partial.rejected_data_points > 0 || !partial.error_message.is_empty())
         {
             tracing::warn!(
-                message = partial.error_message,
-                "failed to export {n} metrics",
-                n = partial.rejected_data_points,
+                err = ?partial,
+                "failed to export metrics",
             );
         }
     }
@@ -149,9 +148,8 @@ impl OtlpResponse for ExportLogsServiceResponse {
             && (partial.rejected_log_records > 0 || !partial.error_message.is_empty())
         {
             tracing::warn!(
-                message = partial.error_message,
-                "failed to export {n} logs",
-                n = partial.rejected_log_records,
+                err = ?partial,
+                "failed to export logs",
             );
         }
     }
@@ -176,9 +174,8 @@ impl OtlpResponse for ExportProfilesServiceResponse {
             && (partial.rejected_profiles > 0 || !partial.error_message.is_empty())
         {
             tracing::warn!(
-                message = partial.error_message,
-                "failed to export {n} profiles",
-                n = partial.rejected_profiles,
+                err = ?partial,
+                "failed to export profiles",
             );
         }
     }
@@ -204,6 +201,7 @@ where
         crate::detector::augment(resource, instance_id, &attributes);
     }
 
+    tracing::trace!(req = ?request, "exporting telemetry");
     let mut buf = BytesMut::with_capacity(request.encoded_len());
     request.encode(&mut buf)?;
 

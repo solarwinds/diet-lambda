@@ -1,5 +1,4 @@
 version: 2
-open-pull-requests-limit: 8
 
 updates:
   - package-ecosystem: github-actions
@@ -9,6 +8,5 @@ updates:
 
   - package-ecosystem: cargo
     directory: "/"
-    versioning-strategy: increase
     schedule:
       interval: weekly

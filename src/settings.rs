@@ -6,6 +6,7 @@ use hyper::{
     Request,
     header::{AUTHORIZATION, USER_AGENT},
 };
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use tokio::{
     fs,
@@ -18,13 +19,17 @@ use crate::{
     util::{Client, body},
 };
 
+#[tracing::instrument(level = "debug", skip_all)]
 async fn fetch(client: &Client, config: &Config) -> Result<Vec<u8>, Error> {
     let response = client
         .request(
             Request::builder()
                 .method("GET")
                 .uri(&config.urls.settings)
-                .header(AUTHORIZATION, format!("Bearer {}", config.token))
+                .header(
+                    AUTHORIZATION,
+                    format!("Bearer {}", config.token.expose_secret()),
+                )
                 .header(USER_AGENT, Config::USER_AGENT)
                 .body(body(Empty::new()))?,
         )
@@ -43,7 +48,7 @@ async fn fetch(client: &Client, config: &Config) -> Result<Vec<u8>, Error> {
     let Settings { warning } = serde_json::from_slice(&body)?;
 
     if let Some(warning) = warning {
-        eprintln!("{warning}");
+        tracing::warn!("{warning}");
     }
 
     // Libraries expect this file to be an array of settings objects
@@ -75,11 +80,11 @@ pub async fn task(
                 // We do this outside the fetch routine because we do NOT want
                 // to get cancelled mid-write.
                 if let Err(err) = fs::write(Config::SETTINGS_PATH, contents).await {
-                    eprintln!("failed to write sampling settings: {err}");
+                    tracing::warn!(%err, "failed to write sampling settings");
                 }
             }
             Some(Err(err)) => {
-                eprintln!("failed to fetch sampling settings: {err}");
+                tracing::warn!(%err, "failed to fetch sampling settings");
             }
             None => {
                 // We have been cancelled

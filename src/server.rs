@@ -2,7 +2,7 @@ use anyhow::Error;
 use axum::Router;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use tower_http::decompression::RequestDecompressionLayer;
+use tower_http::{decompression::RequestDecompressionLayer, trace::TraceLayer};
 
 use crate::{ServiceRequest, env::Config, util::MultiListener};
 
@@ -18,8 +18,9 @@ pub async fn task(
         .merge(telemetry::router())
         .merge(http::router())
         .with_state(tx.clone())
-        .layer(RequestDecompressionLayer::new().gzip(true))
-        .merge(grpc::router(tx));
+        .layer(RequestDecompressionLayer::new().gzip(true).zstd(true))
+        .layer(TraceLayer::new_for_http())
+        .merge(grpc::router(tx).layer(TraceLayer::new_for_grpc()));
 
     let listener = MultiListener::bind(Config::BIND_ADDRESSES).await?;
     axum::serve(listener, router)

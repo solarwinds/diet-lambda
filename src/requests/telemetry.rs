@@ -8,6 +8,7 @@ use crate::{
     util::{Client, body},
 };
 
+#[tracing::instrument(level = "debug", err, skip_all)]
 pub async fn register(client: &Client, config: &Config, id: &str) -> Result<(), Error> {
     let data = format!(
         r#"{{

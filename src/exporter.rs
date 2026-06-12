@@ -1,5 +1,6 @@
 use std::{
-    future, io::Cursor, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll, time::Duration,
+    fmt::Debug, future, io::Cursor, mem, num::NonZeroUsize, pin::pin, sync::Arc, task::Poll,
+    time::Duration,
 };
 
 use anyhow::Error;
@@ -28,6 +29,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::Status,
 };
 use prost::Message;
+use secrecy::{ExposeSecret, SecretString};
 use tokio::{
     io::AsyncRead,
     sync::{mpsc, watch},
@@ -66,7 +68,7 @@ struct State {
     cache: LruCache<Vec<u8>, (Vec<u8>, Vec<u8>)>,
 }
 
-trait OtlpRequest: Message {
+trait OtlpRequest: Message + Debug {
     type Response: OtlpResponse;
 
     fn is_empty(&self) -> bool;
@@ -94,10 +96,9 @@ impl OtlpResponse for ExportTraceServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_spans > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} traces: {message}",
-                n = partial.rejected_spans,
-                message = partial.error_message,
+            tracing::warn!(
+                err = ?partial,
+                "failed to export traces",
             );
         }
     }
@@ -121,10 +122,9 @@ impl OtlpResponse for ExportMetricsServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_data_points > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} metrics: {message}",
-                n = partial.rejected_data_points,
-                message = partial.error_message,
+            tracing::warn!(
+                err = ?partial,
+                "failed to export metrics",
             );
         }
     }
@@ -148,10 +148,9 @@ impl OtlpResponse for ExportLogsServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_log_records > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} logs: {message}",
-                n = partial.rejected_log_records,
-                message = partial.error_message,
+            tracing::warn!(
+                err = ?partial,
+                "failed to export logs",
             );
         }
     }
@@ -175,10 +174,9 @@ impl OtlpResponse for ExportProfilesServiceResponse {
         if let Some(partial) = &self.partial_success
             && (partial.rejected_profiles > 0 || !partial.error_message.is_empty())
         {
-            eprintln!(
-                "failed to export {n} profiles: {message}",
-                n = partial.rejected_profiles,
-                message = partial.error_message,
+            tracing::warn!(
+                err = ?partial,
+                "failed to export profiles",
             );
         }
     }
@@ -188,7 +186,7 @@ async fn send<R>(
     mut request: R,
     mut client: FollowRedirect<Client>,
     url: String,
-    token: String,
+    token: SecretString,
     compression: Compression,
     instance_id: Uuid,
     attributes: Arc<[KeyValue]>,
@@ -204,6 +202,7 @@ where
         crate::detector::augment(resource, instance_id, &attributes);
     }
 
+    tracing::trace!(req = ?request, "exporting telemetry");
     let mut buf = BytesMut::with_capacity(request.encoded_len());
     request.encode(&mut buf)?;
 
@@ -233,7 +232,7 @@ where
                 .uri(url)
                 .header(CONTENT_TYPE, "application/x-protobuf")
                 .header(CONTENT_ENCODING, encoding)
-                .header(AUTHORIZATION, format!("Bearer {token}"))
+                .header(AUTHORIZATION, format!("Bearer {}", token.expose_secret()))
                 .header(USER_AGENT, Config::USER_AGENT)
                 .body(body(compressed))?,
         )
@@ -245,14 +244,15 @@ where
     if let Ok(res) = R::Response::decode(body.as_ref()) {
         res.log();
     } else if let Ok(status) = Status::decode(body.as_ref()) {
-        eprintln!("failed to export telemetry: {}", status.message);
+        tracing::warn!(status = status.message, "failed to export telemetry");
     } else {
-        eprintln!("invalid response from collector: {:#?}", parts);
+        tracing::warn!(res = ?parts, "invalid response from collector");
     }
 
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 fn export(state: &mut State, config: &Config, id: Option<String>) {
     let notifier = state.notifier.clone();
     let mut tasks = JoinSet::new();
@@ -351,7 +351,7 @@ fn export(state: &mut State, config: &Config, id: Option<String>) {
     state.tracker.spawn(async move {
         while let Some(result) = tasks.join_next().await {
             if let Err(err) = flatten(result) {
-                eprintln!("failed to export telemetry: {err}");
+                tracing::warn!(%err, "failed to export telemetry");
             }
         }
         let _ = notifier.send(id);

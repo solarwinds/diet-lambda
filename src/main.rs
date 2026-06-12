@@ -10,6 +10,10 @@ use tokio::{
     task::JoinSet,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::Level;
+use tracing_subscriber::{
+    EnvFilter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
 use crate::{env::Config, util::flatten};
 
@@ -31,6 +35,20 @@ pub enum ServiceRequest {
 }
 
 fn main() -> Result<(), Error> {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .without_time()
+                .with_span_events(FmtSpan::ACTIVE),
+        )
+        .with(
+            EnvFilter::builder()
+                .with_default_directive(Level::INFO.into())
+                .with_env_var("OPENTELEMETRY_EXTENSION_LOG_LEVEL")
+                .from_env_lossy(),
+        )
+        .try_init()?;
+
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_io()
         .enable_time()
@@ -83,7 +101,7 @@ fn main() -> Result<(), Error> {
                 while let Some(result) = tasks.join_next().await {
                     if let Err(err) = flatten(result) {
                         token.cancel();
-                        eprintln!("{err}");
+                        tracing::error!(%err, "extension lifecycle error");
                     }
                 }
             }
@@ -123,7 +141,7 @@ fn main() -> Result<(), Error> {
         }
 
         if let Err(err) = tasks.await {
-            eprintln!("{err}");
+            tracing::error!(%err, "extension lifecycle error")
         }
         Ok(())
     });

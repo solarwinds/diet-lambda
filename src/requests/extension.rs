@@ -10,6 +10,7 @@ use crate::{
     util::{Client, body},
 };
 
+#[tracing::instrument(level = "debug", err, skip_all)]
 pub async fn register(client: &Client, config: &Config) -> Result<(String, Option<String>), Error> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -52,6 +53,7 @@ pub async fn register(client: &Client, config: &Config) -> Result<(String, Optio
     Ok((id, account_id))
 }
 
+#[tracing::instrument(level = "debug", err, skip_all)]
 pub async fn next(client: &Client, config: &Config, id: &str) -> Result<NextEvent, Error> {
     let response = client
         .request(

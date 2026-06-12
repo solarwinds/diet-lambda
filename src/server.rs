@@ -18,7 +18,7 @@ pub async fn task(
         .merge(telemetry::router())
         .merge(http::router())
         .with_state(tx.clone())
-        .layer(RequestDecompressionLayer::new().gzip(true))
+        .layer(RequestDecompressionLayer::new().gzip(true).zstd(true))
         .layer(TraceLayer::new_for_http())
         .merge(grpc::router(tx).layer(TraceLayer::new_for_grpc()));
 

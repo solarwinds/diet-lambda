@@ -159,7 +159,7 @@ impl Config {
                 "zstd" => Some(Compression::Zstd),
                 _ => None,
             })
-            .unwrap_or(Compression::Gzip);
+            .unwrap_or(Compression::Zstd);
 
         Ok(Arc::new(Self {
             urls: UrlsConfig {

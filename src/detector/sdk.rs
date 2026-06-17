@@ -12,7 +12,7 @@ pub fn detect(attributes: &mut Vec<KeyValue>) {
         key: "sw.apm.otelcol.version".to_string(),
         value: Some(AnyValue {
             value: Some(Value::StringValue(
-                concat!(env!("CARGO_PKG_VERSION"), "+", env!("CARGO_PKG_NAME")).to_string(),
+                concat!(env!("CARGO_PKG_VERSION"), "+rust").to_string(),
             )),
         }),
         ..Default::default()

@@ -37,7 +37,7 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION="$(cargo pkgid | awk -F'#' '{print $NF}')"
+          VERSION="$(cargo pkgid | awk -F'#' '{ print $NF }')"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           MAJOR="$(echo "$VERSION" | awk -F. '{ print $1 }')"
           MINOR="$(echo "$VERSION" | awk -F. '{ print $2 }')"

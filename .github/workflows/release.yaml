@@ -20,7 +20,7 @@ jobs:
       contents: read
 
     steps:
-      - run: dnf update -y && dnf install -y git tar awk gcc pkg-config openssl-devel
+      - run: dnf update -y && dnf install -y git tar gcc pkg-config openssl-devel
 
       - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1

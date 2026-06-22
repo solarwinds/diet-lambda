@@ -205,8 +205,8 @@ jobs:
       - name: RL Scan
         run: |
           docker run --rm -v "${{ github.workspace }}:/workspace" \
-            -e RLPORTAL_ACCESS_TOKEN="${{ secrets.RLPORTAL_ACCESS_TOKEN }}" \
-            reversinglabs/rl-scanner-cloud rl-scan \
+          -e RLPORTAL_ACCESS_TOKEN="${{ secrets.RLPORTAL_ACCESS_TOKEN }}" \
+          reversinglabs/rl-scanner-cloud rl-scan \
           --rl-portal-server solarwinds \
           --rl-portal-org SolarWinds \
           --rl-portal-group SaaS-Agents-SWO \

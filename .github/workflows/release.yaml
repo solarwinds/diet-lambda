@@ -1,6 +1,17 @@
 name: Release
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to AWS and GHCR
+        required: true
+        default: true
+        type: boolean
+      scan:
+        description: Run RL scanning
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   build:
@@ -48,6 +59,7 @@ jobs:
 
   prod:
     needs: build
+    if: inputs.publish
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -103,7 +115,7 @@ jobs:
 
   docker:
     needs: build
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: inputs.publish
     strategy:
       matrix:
         arch: [x86_64, aarch64]
@@ -138,8 +150,8 @@ jobs:
     needs:
       - build
       - docker
+    if: inputs.publish
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     permissions:
       contents: read
@@ -167,3 +179,37 @@ jobs:
             --tag ghcr.io/${{ github.repository }}:$PATCH \
             ghcr.io/${{ github.repository }}:x86_64$SUFFIX \
             ghcr.io/${{ github.repository }}:aarch64$SUFFIX
+
+  scan:
+    needs: build
+    if: inputs.scan
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: diet-lambda-x86_64
+          path: x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: diet-lambda-aarch64
+          path: aarch64
+
+      - run: ls -AR
+      - run: zip -r diet-lambda.zip src x86_64 aarch64 Cargo.toml Cargo.lock .cargo LICENSE
+
+      - name: RL Scan
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" \
+          -e RLPORTAL_ACCESS_TOKEN="${{ secrets.RLPORTAL_ACCESS_TOKEN }}" \
+          reversinglabs/rl-scanner-cloud rl-scan \
+          --rl-portal-server solarwinds \
+          --rl-portal-org SolarWinds \
+          --rl-portal-group SaaS-Agents-SWO \
+          --purl diet-lambda/diet-lambda@${{ needs.build.outputs.version }} \
+          --file-path /workspace/diet-lambda.zip \
+          --submit-only --replace

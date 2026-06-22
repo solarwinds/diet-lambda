@@ -59,7 +59,7 @@ jobs:
 
   prod:
     needs: build
-    if: github.event.inputs.publish
+    if: inputs.publish
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -115,7 +115,7 @@ jobs:
 
   docker:
     needs: build
-    if: github.event.inputs.publish
+    if: inputs.publish
     strategy:
       matrix:
         arch: [x86_64, aarch64]
@@ -150,7 +150,7 @@ jobs:
     needs:
       - build
       - docker
-    if: github.event.inputs.publish
+    if: inputs.publish
     runs-on: ubuntu-latest
 
     permissions:
@@ -182,7 +182,7 @@ jobs:
 
   scan:
     needs: build
-    if: github.event.inputs.scan
+    if: inputs.scan
     runs-on: ubuntu-latest
 
     permissions:

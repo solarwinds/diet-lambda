@@ -3,12 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Whether to publish to AWS and GHCR
+        description: Publish to AWS and GHCR
         required: true
         default: true
         type: boolean
       scan:
-        description: Whether to run RL scanning
+        description: Run RL scanning
         required: true
         default: true
         type: boolean
@@ -200,7 +200,7 @@ jobs:
           path: aarch64
 
       - run: ls -AR
-      - run: zip -r diet-lambda.zip .
+      - run: zip -r diet-lambda.zip src x86_64 aarch64 Cargo.toml Cargo.lock .cargo LICENSE
 
       - name: RL Scan
         run: |

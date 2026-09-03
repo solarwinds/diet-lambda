@@ -40,6 +40,6 @@ COPY --from=collector /opt/extensions/diet-lambda /opt/extensions/diet-lambda
 
 ## Developing
 
-The collector requires a nightly Rust toolchain in order to build the standard library while optimizing for a small binary size. It uses the standard Cargo workflow, just run `cargo build`. `rustfmt` and `clippy` are run in CI, which will fail if there are any warnings.
+The collector uses the stable Rust toolchain. It uses the standard Cargo workflow, just run `cargo build`. `rustfmt` and `clippy` are run in CI, which will fail if there are any warnings.
 
 The primary goal of this collector is to be lightweight, as such dependencies should be vetted and kept to a minimum, and niche features should be kept to the Go collector if they might bloat this collector for people who do not need them.

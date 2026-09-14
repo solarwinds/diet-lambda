@@ -30,7 +30,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         if: matrix.language == 'rust'
       - run: cargo build
         if: matrix.language == 'rust'

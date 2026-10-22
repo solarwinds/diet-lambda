@@ -31,7 +31,7 @@ hyper-util = { version = "0.1.19", features = [
 lambda-extension = { version = "1.0.3", default-features = false, features = [
 ] }
 lru = { version = "0.18.0", default-features = false, features = [] }
-opentelemetry-proto = { version = "0.32.0", default-features = false, features = [
+opentelemetry-proto = { version = "0.33.0", default-features = false, features = [
     "trace",
     "metrics",
     "logs",
